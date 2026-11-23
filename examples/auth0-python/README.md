@@ -2,7 +2,7 @@
 
 A Python client for the Universal SSO gateway (`ssod`). It starts a sign-in for the `auth0` provider with an Auth0 tenant, checks the redirect the gateway returns, and (for the mock provider) completes the sign-in without a browser.
 
-> **Read this first.** This client talks to the gateway in this repository. The gateway implements `mock`, `google`, `okta`, `auth0` and `azure`. SAML 2.0 and generic OAuth 2.0 are planned, so `SSO_PROVIDER=saml` and `SSO_PROVIDER=oauth2` answer `404 PROVIDER_NOT_FOUND`, which this client reports clearly. Okta, Auth0 and Azure are tested against an in-process fake IdP (`bash tests/e2e.sh` in the repository root), not against live tenants. The full flow runs without a browser with `make login-mock` or `bash tests/e2e.sh`. See [Provider status](../../Docs/Quickstart.md#provider-status).
+> **Read this first.** This client talks to the gateway in this repository. The gateway implements `mock`, `google`, `okta`, `auth0`, `azure`, generic `oauth2` and `saml`. Okta, Auth0, Azure, OAuth 2.0 and SAML 2.0 are tested only against in-process fake IdPs (`bash tests/e2e.sh` in the repository root), not against live tenants. SAML 2.0 works end to end with the Go client only, because this client requires the OAuth `state` and PKCE parameters that a SAML redirect (`SAMLRequest` and `RelayState`) does not carry, so do not use `SSO_PROVIDER=saml` here. A provider that is not configured in the gateway answers `404 PROVIDER_NOT_FOUND`, which this client reports clearly. The full flow runs without a browser with `make login-mock` or `bash tests/e2e.sh`. See [Provider status](../../Docs/Quickstart.md#provider-status).
 
 ## What this client does, and does not do
 

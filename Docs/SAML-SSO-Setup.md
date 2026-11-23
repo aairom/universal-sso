@@ -2,7 +2,7 @@
 
 Step-by-step instructions for configuring **a SAML 2.0 identity provider (IdP)** against Universal SSO acting as the **service provider (SP)**: SP metadata, Assertion Consumer Service (ACS) URL, certificates, attribute mapping, and the validation rules the server must enforce. The guide is IdP-neutral and shows where Okta and Microsoft Entra ID differ. Other SAML IdPs (Keycloak, ADFS, Ping, Shibboleth, Google Workspace SAML apps) follow the same pattern.
 
-> **Project status.** SAML 2.0 is **planned, not yet implemented**. `pkg/sso` already defines `ProtocolSAML2` and a `SAMLResponse` field on `CallbackRequest`, plus the generic provider interface, driver registry and state handling that a `saml` driver will plug into. Until the adapter exists, `ssod` does not register `saml` and `/auth/saml/login` answers `404 PROVIDER_NOT_FOUND`. The `SSO_PROVIDERS_SAML_*` variables in this guide are **proposed names**. They are not in `.env.example` yet and no code reads them. Everything on the **IdP's side** (sections 1 to 3 and the manual checks in section 5) works today and is worth finishing first. The `make google-*` helpers are Google-only, so this guide uses `curl`, `openssl`, `xmllint` and `python3` instead.
+> **Project status.** SAML 2.0 is **implemented** in `pkg/sso/saml` as SP-initiated Web Browser SSO (HTTP-Redirect request, HTTP-POST response). It is verified only against an in-process fake IdP (`pkg/sso/saml/samltest`), **never against a live IdP**, and only the Go example client can complete a SAML sign-in end to end (the other clients need OAuth `state` and PKCE parameters that a SAML redirect does not carry). **Not supported:** encrypted assertions (refused), IdP-initiated SSO (refused), Single Logout, SHA-1, refresh, revoke, userinfo and token validation (those return `UNSUPPORTED_METHOD`). The adapter does **not** serve SP metadata: you create it by hand (section 3.2). IdP metadata is not signature-checked: trust comes from where you load it, a local file or an https URL. `ssod` registers `saml` when `SSO_PROVIDERS_SAML_SP_ENTITY_ID` is set to a real value together with IdP metadata; SAML has no client id or secret. Validate your settings with `make provider-check P=saml`. The `make google-*` helpers are Google-only, so the manual checks in this guide use `curl`, `openssl`, `xmllint` and `python3`.
 
 SAML consoles differ a lot between vendors. This guide names the **generic fields** every IdP asks for, and gives the exact labels for Okta and Entra ID. If a label differs in your IdP, match by meaning, and use the linked specifications as the source of truth.
 
@@ -26,14 +26,14 @@ SAML consoles differ a lot between vendors. This guide names the **generic field
 
 | # | Symptom | Cause | Go to |
 |---|---|---|---|
-| 1 | `/auth/saml/login` returns 404 | The `saml` adapter is not implemented yet, so the provider is never registered | [7.7](#77-errors-returned-by-this-project) |
+| 1 | `/auth/saml/login` returns 404 | `saml` is not registered: `SSO_PROVIDERS_SAML_SP_ENTITY_ID` is empty or still the placeholder, or no IdP metadata is set. Run `make provider-check P=saml` | [4.3](#43-env-layout), [7.7](#77-errors-returned-by-this-project) |
 | 2 | "Which URL goes into the ACS field?" | `{SSO_SERVER_BASE_URL}/auth/saml/callback`. It is the SP's **POST** endpoint | [S2 below](#s2-the-four-values-every-idp-asks-for), [3.2](#32-acs-url-and-entity-id) |
 | 3 | IdP says "Audience does not match" or "Invalid Issuer" | The SP Entity ID in the IdP differs from the one in the SP's config | [7.1](#71-audience-destination-and-entity-id-mismatch) |
 | 4 | "Signature validation failed" | The IdP signing certificate is missing, expired, rotated, or the wrong element is signed | [7.2](#72-signature-validation-failed) |
 | 5 | "The assertion is not yet valid" or "has expired" | Clock skew between the IdP and the server | [7.3](#73-clock-skew-notbefore-and-notonorafter) |
 | 6 | The IdP shows an error before sign-in | The SP metadata or ACS URL was entered wrongly, or the user is not assigned | [7.4](#74-the-idp-rejects-the-request), [7.5](#75-user-not-assigned-and-nameid-problems) |
 | 7 | "I get a `SAMLResponse` but cannot read it" | It is base64 XML. Decode it as in 5.3 | [5.3](#53-capture-and-decode-a-samlresponse) |
-| 8 | `.env` has no SAML block | The SAML variables are proposed and not in `.env.example` yet | [4.3](#43-env-layout) |
+| 8 | Which variables does `.env` need? | `SSO_PROVIDERS_SAML_SP_ENTITY_ID` plus one of `_IDP_METADATA_URL` / `_IDP_METADATA_FILE`. The block is in `.env.example` | [4.3](#43-env-layout) |
 
 ### Fastest path (about 20 minutes)
 
@@ -61,7 +61,7 @@ xmllint --noout idp-metadata.xml && echo "metadata is well-formed XML"
 #    capture the SAMLResponse and decode it (section 5.3).
 ```
 
-A decoded response whose checks pass in 5.4 means the IdP side is correct. The last step, the end-to-end test through `ssod` (section 5.6), needs the planned `saml` adapter.
+A decoded response whose checks pass in 5.4 means the IdP side is correct. The last step is the end-to-end test through `ssod` (section 5.6).
 
 ### S1. Console navigation
 
@@ -88,7 +88,7 @@ Expected values for local development:
 | IdP field names (varies) | What it is | Value for this project |
 |---|---|---|
 | Single sign-on URL, **ACS URL**, Reply URL, Assertion Consumer Service URL, Recipient | Where the IdP **POSTs** the signed response. The SP's `AssertionConsumerService` | `{SSO_SERVER_BASE_URL}/auth/saml/callback` |
-| **Audience URI**, SP Entity ID, Identifier, Issuer of the SP | The SP's unique name. Appears in `<Audience>` and in the SP's request `<Issuer>` | `{SSO_SERVER_BASE_URL}/auth/saml/metadata` (proposed, any stable URI works) |
+| **Audience URI**, SP Entity ID, Identifier, Issuer of the SP | The SP's unique name. Appears in `<Audience>` and in the SP's request `<Issuer>` | `{SSO_SERVER_BASE_URL}/auth/saml/metadata` (any stable URI works; it need not be reachable) |
 | Name ID format | How the user is identified | `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` or `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent` |
 | Default Relay State, Sign on URL | Optional. Where the user lands, or an SP-initiated start URL | Leave empty |
 
@@ -99,11 +99,11 @@ The Entity ID is only a **name**. It does not need to resolve on the web, but it
 | Flow | Starts at | Notes |
 |---|---|---|
 | **SP-initiated** | `GET /auth/saml/login` on `ssod`, which sends an `AuthnRequest` | Recommended. The response carries `InResponseTo`, which the server checks against the request it made. The state is bound to the browser session |
-| **IdP-initiated** | The user clicks the app tile at the IdP | There is no `AuthnRequest`, so no `InResponseTo` to check. This weakens replay and CSRF protection. The planned adapter will refuse it by default |
+| **IdP-initiated** | The user clicks the app tile at the IdP | There is no `AuthnRequest`, so no `InResponseTo` to check. This weakens replay and CSRF protection. `ssod` refuses it: a response whose `RelayState` is not one it issued is rejected with `STATE_MISMATCH` |
 
 ### S4. The browser shows "This site can't be reached" after sign-in
 
-This is expected when `ssod` is not handling `POST /auth/saml/callback` (and today it is not, because the adapter is planned): the IdP posts an HTML form to your ACS URL and nothing is listening. To capture the `SAMLResponse` for inspection anyway, use your browser's developer tools network tab (**Preserve log** on) and copy the form field `SAMLResponse` from the POST request, or use a browser extension such as "SAML-tracer". Then follow 5.3.
+This happens when the ACS URL registered at the IdP does not reach `ssod`, for example it points at another host or port, or `ssod` is not running. `ssod` handles `POST /auth/saml/callback`. To capture the `SAMLResponse` for inspection anyway, use your browser's developer tools network tab (**Preserve log** on) and copy the form field `SAMLResponse` from the POST request, or use a browser extension such as "SAML-tracer". Then follow 5.3.
 
 ### S5. Test users and assignment
 
@@ -115,7 +115,7 @@ Almost every IdP requires you to **assign** users or groups to the SAML app. If 
 
 SAML 2.0 is an XML-based single sign-on protocol. The user's **browser** carries signed XML messages between the **service provider** (this project, `ssod`) and the **identity provider** (the IdP). Unlike OIDC there is no back-channel token call: the signed **assertion** travels through the browser, so its **signature and conditions** are the whole security of the flow.
 
-Universal SSO will use **SP-initiated Web Browser SSO** with the **HTTP-Redirect** binding for the request and the **HTTP-POST** binding for the response.
+Universal SSO uses **SP-initiated Web Browser SSO** with the **HTTP-Redirect** binding for the request and the **HTTP-POST** binding for the response.
 
 ```mermaid
 sequenceDiagram
@@ -154,7 +154,7 @@ SAML elements and URNs used (all from the OASIS specifications in section 8):
 | Success status | `urn:oasis:names:tc:SAML:2.0:status:Success` |
 | Other status codes | `Requester`, `Responder`, `VersionMismatch`, `AuthnFailed`, `NoPassive`, `InvalidNameIDPolicy`, `RequestDenied`, `UnsupportedBinding`, `UnknownPrincipal` (all under the same `urn:oasis:names:tc:SAML:2.0:status:` prefix) |
 
-The SP publishes its own **metadata** XML (`EntityDescriptor` with `SPSSODescriptor`, `AssertionConsumerService`, and a `KeyDescriptor`) so the IdP can be configured by import. The planned adapter serves it at `/auth/saml/metadata`. Until then, create it by hand (section 3.2).
+The SP publishes its own **metadata** XML (`EntityDescriptor` with `SPSSODescriptor`, `AssertionConsumerService`, and a `KeyDescriptor`) so the IdP can be configured by import. The adapter does **not** serve it: `ssod` has no `/auth/saml/metadata` endpoint. Create the file by hand (section 3.2) or type the values into the IdP console. The SP entity ID is only an identifier and does not have to be a reachable URL.
 
 ---
 
@@ -249,7 +249,7 @@ Certificate lifetime: IdP signing certificates expire. Entra's default is **thre
 
 ### 3.2 ACS URL and Entity ID
 
-This project will serve the callback (ACS) at:
+This project serves the callback (ACS) at:
 
 ```text
 POST {SSO_SERVER_BASE_URL}/auth/{provider}/callback
@@ -257,7 +257,7 @@ POST {SSO_SERVER_BASE_URL}/auth/{provider}/callback
 
 With the provider ID `saml`:
 
-| Environment | ACS URL | SP Entity ID (proposed) |
+| Environment | ACS URL | SP Entity ID (example) |
 |---|---|---|
 | Local development | `http://localhost:8080/auth/saml/callback` | `http://localhost:8080/auth/saml/metadata` |
 | Staging | `https://sso-staging.<your-domain>/auth/saml/callback` | `https://sso-staging.<your-domain>/auth/saml/metadata` |
@@ -314,7 +314,7 @@ Add a `<KeyDescriptor use="signing">` with your `sp.crt` (base64 body without th
 
 ### 4.3 `.env` layout
 
-> **Proposed, not implemented.** These variable names are the intended contract for the `saml` adapter. They are **not** in `.env.example` and no code reads them yet. They may change when the adapter is written.
+> **Implemented.** These are the variables `ssod` reads (`cmd/ssod/vendors.go`), and the same block is in `.env.example`. SAML stays switched off while the entity ID is empty or ends in `-placeholder`. Set exactly one of the two metadata variables. A file is parsed at start-up and a bad file stops `ssod`; a URL (https, or http for localhost) is fetched lazily and cached for one hour. `ACS_URL` defaults to `<SSO_SERVER_BASE_URL>/auth/saml/callback`. `SP_CERT_FILE` and `SP_KEY_FILE` are optional, must be set together, and the RSA key must be at least 2048 bits.
 
 ```bash
 # --- Server ---
@@ -323,7 +323,7 @@ SSO_SERVER_PORT=8080
 SSO_SERVER_BASE_URL=http://localhost:8080
 SSO_STATE_SECRET=<output of: openssl rand -base64 48>
 
-# --- SAML 2.0 (proposed names, values from your IdP) ---
+# --- SAML 2.0 (values from your IdP) ---
 SSO_PROVIDERS_SAML_IDP_METADATA_URL=https://<idp-host>/<path-to-metadata>
 # Alternative to the URL: a local copy of the metadata file
 # SSO_PROVIDERS_SAML_IDP_METADATA_FILE=./_saml/idp-metadata.xml
@@ -358,7 +358,7 @@ Rules for this file:
 
 These checks use only `curl`, `openssl`, `xmllint`, a browser, and `python3`. They validate the SAML configuration independently of the application code.
 
-> **Note.** The `make google-*` helpers do not support SAML. The steps below are the manual equivalent. A helper for SAML will come with the adapter.
+> **Note.** The `make google-*` helpers do not support SAML. `make provider-check P=saml [--online]` validates the SAML settings in `.env` (entity id, metadata, key pairing, ACS URL) and the steps below are the manual IdP-side checks.
 
 ### 5.1 Validate the IdP metadata and certificate
 
@@ -397,7 +397,7 @@ A download failure is a network or proxy problem. A 404 means the metadata URL i
 
 ### 5.2 Start a login and see the request
 
-Until the adapter exists, you can build an `AuthnRequest` by hand to see what the IdP receives. The HTTP-Redirect binding encodes the XML as **raw DEFLATE, then base64, then URL-encoding**:
+To see what the IdP receives, you can build an `AuthnRequest` by hand (the adapter builds the same kind of request, deflated and base64-encoded, in `Login`). The HTTP-Redirect binding encodes the XML as **raw DEFLATE, then base64, then URL-encoding**:
 
 ```bash
 python3 - <<'EOF'
@@ -448,7 +448,7 @@ A `SAMLResponse` is plain base64 here (HTTP-POST binding does **not** deflate). 
 
 ### 5.4 Check the response against the validation checklist
 
-These are the checks the planned adapter will perform. Do them by hand once so you know what "correct" looks like:
+These are the checks the adapter performs (section 6.4). Do them by hand once so you know what "correct" looks like:
 
 ```bash
 python3 - <<'EOF'
@@ -499,16 +499,16 @@ export SSO_STATE_SECRET=$(openssl rand -base64 48)
 make start
 curl -s http://127.0.0.1:8080/healthz
 curl -s http://127.0.0.1:8080/providers
-curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8080/auth/saml/login"                    # 404 until the adapter exists
+curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8080/auth/saml/login"                    # 404 unless saml is configured, else 302 to the IdP
 curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8080/auth/mock/callback?state=forged"   # 400
 make stop
 ```
 
-The `mock` provider exercises the same state and replay protections that the SAML provider will use.
+The `mock` provider exercises the same state and replay protections that the SAML provider uses.
 
 ### 5.6 End-to-end test through `ssod`
 
-This section applies once the `saml` adapter is implemented.
+Everything the project could verify without a live IdP is covered by `bash tests/e2e.sh` (the Go client signs in through `ssod` and the fake IdP in `pkg/sso/saml/samltest`, a forged or missing `RelayState` is refused). The steps below are the manual run against your real IdP, which has **not** been done for this project.
 
 1. Fill in `.env` as in 4.3 and run `make start`. The log should show `saml` among the providers.
 2. Open `http://localhost:8080/auth/saml/login` in a browser.
@@ -546,20 +546,20 @@ This section applies once the `saml` adapter is implemented.
 
 ### 6.4 Keep the SAML flow hardened
 
-SAML attacks target XML parsing and signature handling. The planned adapter will implement each control below:
+SAML attacks target XML parsing and signature handling. `pkg/sso/saml` implements each control below, each with a unit test against the fake IdP:
 
 | Control | Status in this project |
 |---|---|
 | Signed, expiring, single-use `RelayState` (CSRF protection) | Implemented in `pkg/sso/state.go`, reusable for SAML |
-| Verify the signature on the Response or the Assertion against the trusted IdP certificate | Planned |
-| Defend against **XML Signature Wrapping**: use only the element the signature actually covers (resolve by `ID` reference) | Planned. See `Docs/Architecture.md` section 5 |
-| Reject DTDs and external entities (**XXE**), and cap the message size | Planned |
-| Check `Destination`, `Recipient`, `Audience`, `Issuer` | Planned |
-| Check `NotBefore` and `NotOnOrAfter` with about ±60 s skew | Planned |
-| Check `InResponseTo` against the pending request, and consume it once | Planned |
-| Assertion ID replay cache until `NotOnOrAfter` | Planned |
-| Reject SHA-1 signatures and weak keys | Planned |
-| Refuse unsolicited (IdP-initiated) responses by default | Planned |
+| Verify the signature on the Response or the Assertion against the trusted IdP certificate | Implemented (goxmldsig, certificates from the metadata) |
+| Defend against **XML Signature Wrapping**: use only the element the signature actually covers (resolve by `ID` reference) | Implemented: exactly one reference to the signed element, and only the verified copy is read. See `Docs/Architecture.md` |
+| Reject DTDs and external entities (**XXE**), and cap the message size | Implemented (1 MiB cap, `<!DOCTYPE` and `<!ENTITY` refused before parsing) |
+| Check `Destination`, `Recipient`, `Audience`, `Issuer` | Implemented |
+| Check `NotBefore` and `NotOnOrAfter` with about ±60 s skew | Implemented |
+| Check `InResponseTo` against the pending request, and consume it once | Implemented (own `state` to request-ID map, 15 minute TTL) |
+| Assertion ID replay cache until `NotOnOrAfter` | Implemented |
+| Reject SHA-1 signatures and weak keys | Implemented (SHA-1 refused, RSA under 2048 bits refused) |
+| Refuse unsolicited (IdP-initiated) responses by default | Implemented |
 | HTTPS in every non-local environment | Required, because the response carries identity data through the browser |
 
 ### 6.5 Identify users correctly
@@ -653,7 +653,7 @@ SAML assertions live for minutes, so a skew of more than about 60 seconds alread
 | `InResponseTo` does not match | The response answers a different (older) request, or the browser used a stale tab | Restart the login. Do not open two logins in one browser session |
 | `STATE_MISMATCH` on the callback | `RelayState` forged, replayed, or consumed already | Restart the login |
 | `STATE_EXPIRED` | The user took longer than the state lifetime | Restart the login |
-| Response accepted twice | Replay cache missing | The adapter must remember assertion IDs until `NotOnOrAfter` |
+| Response accepted twice | Not expected: the assertion ID is cached and the `RelayState` is single use | The second post is refused. Restart the login |
 | IdP-initiated response rejected | No `InResponseTo`, no pending request | Use SP-initiated login, or enable unsolicited responses explicitly (not recommended) |
 
 ### 7.7 Errors returned by this project
@@ -663,7 +663,8 @@ SAML assertions live for minutes, so a skew of more than about 60 seconds alread
 | `STATE_MISMATCH` | 400 | Forged, replayed, or already-used `RelayState`, or state issued for a different provider. Restart login |
 | `STATE_EXPIRED` | 400 | The signed state exceeded its lifetime (10 minutes by default). Restart login |
 | `IDP_REJECTED` | 401 | The response status was not `Success` (for example `AuthnFailed`, `RequestDenied`) |
-| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. **Today this is always the result for `saml`**, because the adapter is not implemented |
+| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. For `saml` this means the entity ID or the IdP metadata is not configured |
+| `UNSUPPORTED_METHOD` | 501 | Refresh, revoke, userinfo or token validation was requested: SAML does not support them |
 | `INVALID_CONFIG` | 500 | Startup problem, such as `SSO_STATE_SECRET` shorter than 32 bytes, or unreadable IdP metadata or key files |
 | `NETWORK_FAILURE` | 502 | `ssod` could not fetch the IdP metadata, or got an unexpected reply. Check connectivity and proxy settings |
 | `SIGNATURE_INVALID` / `INVALID_TOKEN` / `TOKEN_EXPIRED` | 401 | The assertion failed verification (signature, issuer, audience, destination, time window, replay). Check the entity IDs, the certificate, and the clock |

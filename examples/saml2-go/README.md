@@ -1,8 +1,8 @@
 # SAML 2.0 in Go
 
-A Go client for the Universal SSO gateway (`ssod`). It starts a sign-in for the `saml` provider with a SAML 2.0 identity provider, checks the redirect the gateway returns, and (for the mock provider) completes the sign-in without a browser.
+A Go client for the Universal SSO gateway (`ssod`). It starts a sign-in for the `saml` provider with a SAML 2.0 identity provider, checks the redirect the gateway returns, and completes the sign-in without a browser for the mock provider, and for `saml` against the test IdP used by `bash tests/e2e.sh`.
 
-> **Read this first.** This client talks to the gateway in this repository. The gateway implements `mock`, `google`, `okta`, `auth0` and `azure`. SAML 2.0 and generic OAuth 2.0 are planned, so `SSO_PROVIDER=saml` and `SSO_PROVIDER=oauth2` answer `404 PROVIDER_NOT_FOUND`, which this client reports clearly. Okta, Auth0 and Azure are tested against an in-process fake IdP (`bash tests/e2e.sh` in the repository root), not against live tenants. The full flow runs without a browser with `make login-mock` or `bash tests/e2e.sh`. See [Provider status](../../Docs/Quickstart.md#provider-status).
+> **Read this first.** This client talks to the gateway in this repository. The gateway implements `mock`, `google`, `okta`, `auth0`, `azure`, generic `oauth2` and `saml`. Okta, Auth0, Azure, OAuth 2.0 and SAML 2.0 are tested only against in-process fake IdPs (`bash tests/e2e.sh` in the repository root), not against live tenants. This is the one client that can complete a SAML sign-in: SAML does not support encrypted assertions, IdP-initiated SSO or Single Logout. A provider that is not configured in the gateway answers `404 PROVIDER_NOT_FOUND`, which this client reports clearly. The full flow runs without a browser with `make login-mock` or `bash tests/e2e.sh`. See [Provider status](../../Docs/Quickstart.md#provider-status).
 
 ## What this client does, and does not do
 
@@ -11,7 +11,7 @@ A Go client for the Universal SSO gateway (`ssod`). It starts a sign-in for the 
 | Checks the gateway: `GET /healthz`, `GET /providers` | Hold OAuth client ids, secrets or signing keys. They stay in the gateway's `.env` |
 | Starts a login: `GET /auth/{provider}/login` | Create or verify the signed `state`, PKCE verifier or nonce. The gateway does |
 | Refuses unsafe redirects: non-https IdP, wrong host, missing `state`, missing PKCE `S256` | Receive tokens. The gateway's callback returns the user profile only and never echoes tokens |
-| Reads the profile from `GET /auth/{provider}/callback` (mock only, no browser needed) | Manage sessions, refresh tokens or call protected APIs. The gateway has no such endpoints yet |
+| Reads the profile from `GET /auth/{provider}/callback` (mock), or posts the test IdP's form to `POST /auth/saml/callback` (`-follow`) | Manage sessions, refresh tokens or call protected APIs. The gateway has no such endpoints yet |
 
 Token refresh, session cookies and protected-resource calls need gateway features that do not exist today. Adding fake ones to a client would be misleading, so they are left out on purpose.
 
@@ -128,7 +128,9 @@ When the gateway redirects with a `SAMLRequest`, the client decodes it (base64 p
 - `AssertionConsumerServiceURL`, if present, is on the gateway host;
 - a `RelayState` is present (it is returned as the login state).
 
-The client cannot validate the SAML **response** signature. The browser posts it to the gateway, which owns that step. See [../../Docs/SAML-SSO-Setup.md](../../Docs/SAML-SSO-Setup.md).
+The client cannot validate the SAML **response** signature. The gateway owns that step. See [../../Docs/SAML-SSO-Setup.md](../../Docs/SAML-SSO-Setup.md).
+
+**`-follow` and the IdP form.** With a real IdP a browser does the sign-in, so `-follow` stops at the redirect. With the test IdP in `bash tests/e2e.sh` (`pkg/sso/saml/samltest`) the IdP answers the redirect with an HTML page holding an auto-submit form. `-follow` detects a `text/html` 200 response, reads only the `SAMLResponse` and `RelayState` fields of the form, and POSTs them to the gateway callback. A form whose action leaves the gateway host is refused (`ErrLeavesGateway`), so the client never sends an assertion to another site. This is how `bash tests/e2e.sh` signs in through `saml` without a browser.
 
 ## Layout
 

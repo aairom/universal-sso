@@ -84,13 +84,13 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <h2>1. Executive summary</h2>
 <p>The launcher gives the five example clients (Rust, Go, Python, Java, C#) and the three OIDC vendor adapters (Okta, Auth0, Microsoft Entra ID) the same guided start that <code>make google-check</code> and <code>make google-url</code> give Google. Before this work, nothing built a client, started a gateway and confirmed that a provider was registered. The user had to do those steps by hand.</p>
 
-<div class="notice"><strong>Scope of verification.</strong> The Okta, Auth0 and Entra adapters were exercised only against the in-process fake identity provider (<code>pkg/sso/oidc/oidctest</code>), never against a live tenant. <code>real</code> mode validates your configuration and prints the sign-in URL. It does not complete the sign-in for you, and it has not been run against a real Okta, Auth0 or Entra tenant. <code>provider-check.sh</code> checks configuration only.</div>
+<div class="notice"><strong>Scope of verification.</strong> The Okta, Auth0, Entra, generic OAuth 2.0 and SAML 2.0 adapters were exercised only against in-process fake identity providers (<code>oidctest</code>, <code>oauth2test</code>, <code>samltest</code>), never against a live tenant or IdP. <code>real</code> mode validates your configuration and prints the sign-in URL. It does not complete the sign-in for you, and it has not been run against a real Okta, Auth0 or Entra tenant (nor any OAuth 2.0 or SAML 2.0 provider). <code>provider-check.sh</code> checks configuration only.</div>
 
 <div class="cards">
 <div class="card"><div class="n">3</div><div class="l">scripts (launcher, checker, helpers)</div></div>
 <div class="card"><div class="n">3</div><div class="l">modes: mock, e2e, real</div></div>
 <div class="card"><div class="n">5 &times; 3</div><div class="l">examples &times; vendor adapters</div></div>
-<div class="card"><div class="n">63</div><div class="l">script checks, all passing</div></div>
+<div class="card"><div class="n">92</div><div class="l">script checks, all passing</div></div>
 </div>
 
 <h3>Key capabilities</h3>
@@ -112,7 +112,7 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <thead><tr><th>Mode</th><th>Gateway</th><th>Credentials</th><th>Sign-in</th><th>What it proves</th></tr></thead>
 <tbody>
 <tr><td><span class="pill p-ok">mock</span> (default)</td><td>Throw-away, mock provider only</td><td>None</td><td>Completed by the client with <code>--follow</code></td><td>The client works with the gateway</td></tr>
-<tr><td><span class="pill p-warn">e2e</span></td><td>Throw-away, built with <code>-tags e2e</code>, fake Okta, Auth0 and Entra</td><td>None (generated)</td><td>Completed by the client with <code>--follow</code></td><td>A client, an adapter and the gateway work together. Not that your tenant works</td></tr>
+<tr><td><span class="pill p-warn">e2e</span></td><td>Throw-away, built with <code>-tags e2e</code>, fake Okta, Auth0, Entra, OAuth 2.0 and SAML 2.0</td><td>None (generated)</td><td>Completed by the client with <code>--follow</code></td><td>A client, an adapter and the gateway work together. Not that your tenant works</td></tr>
 <tr><td><span class="pill p-acc">real</span></td><td>Project gateway through <code>scripts/start.sh</code></td><td>Yours, from <code>.env</code></td><td>You finish it in a browser</td><td>Your configuration is consistent and the provider is registered</td></tr>
 </tbody></table></div>
 </section>
@@ -133,7 +133,7 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <tr><td>Fake IdP</td><td><code>pkg/sso/oidc/oidctest</code></td><td>In-process OIDC server, mounted only in the <code>-tags e2e</code> build</td></tr>
 <tr><td>Example clients</td><td><code>examples/*</code></td><td>Rust, Go, Python, Java, C#. Commands <code>check</code> and <code>login [--follow]</code></td></tr>
 <tr><td>Google helper</td><td><code>cmd/ssoctl</code></td><td>Used by <code>real</code> mode when the provider is <code>google</code></td></tr>
-<tr><td>Tests</td><td><code>tests/scripts_test.sh</code>, <code>tests/e2e.sh</code>, <code>tests/run_tests.sh</code></td><td>63 script checks, 24 end-to-end sign-ins, and the aggregate runner</td></tr>
+<tr><td>Tests</td><td><code>tests/scripts_test.sh</code>, <code>tests/e2e.sh</code>, <code>tests/run_tests.sh</code></td><td>92 script checks, 32 end-to-end checks, and the aggregate runner</td></tr>
 </tbody></table></div>
 
 <figure>
@@ -259,13 +259,13 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <tr><td><code>--check-only</code></td><td>Validate toolchain (mock, e2e) or settings (real), build and start nothing</td></tr>
 </tbody></table></div>
 
-<h3>3.3 Launch scripts for five examples and three vendor adapters</h3>
-<p>Each example has a default provider that matches its name. Two of those providers do not exist in the gateway yet, and the launcher says so instead of failing late.</p>
+<h3>3.3 Launch scripts for five examples and the vendor adapters</h3>
+<p>Each example has a default provider that matches its name. All five providers now exist in the gateway, each verified against an in-process fake only. SAML 2.0 works with the Go example only: the other four clients require the OAuth <code>state</code> and PKCE parameters, which a SAML redirect does not carry, and the launcher refuses the combination up front instead of failing late.</p>
 <div class="tblwrap"><table>
 <thead><tr><th>Example</th><th>Directory</th><th>Toolchain</th><th>Default provider</th><th>Gateway adapter</th><th>Launch</th></tr></thead>
 <tbody>
-<tr><td>rust</td><td><code>examples/oauth2-rust</code></td><td>cargo</td><td><code>oauth2</code></td><td><span class="pill p-bad">none yet</span></td><td>pass <code>--provider</code></td></tr>
-<tr><td>go</td><td><code>examples/saml2-go</code></td><td>Go 1.22+</td><td><code>saml</code></td><td><span class="pill p-bad">none yet</span></td><td>pass <code>--provider</code></td></tr>
+<tr><td>rust</td><td><code>examples/oauth2-rust</code></td><td>cargo</td><td><code>oauth2</code></td><td><span class="pill p-ok">oauth2</span></td><td><code>run-example.sh rust</code></td></tr>
+<tr><td>go</td><td><code>examples/saml2-go</code></td><td>Go 1.22+</td><td><code>saml</code></td><td><span class="pill p-ok">saml</span></td><td><code>run-example.sh go</code></td></tr>
 <tr><td>python</td><td><code>examples/auth0-python</code></td><td>Python 3.9+</td><td><code>auth0</code></td><td><span class="pill p-ok">auth0</span></td><td><code>run-example.sh python</code></td></tr>
 <tr><td>java</td><td><code>examples/okta-java</code></td><td>JDK 21+, Maven</td><td><code>okta</code></td><td><span class="pill p-ok">okta</span></td><td><code>run-example.sh java</code></td></tr>
 <tr><td>csharp</td><td><code>examples/azure-ad-csharp</code></td><td>.NET 8 SDK</td><td><code>azure</code></td><td><span class="pill p-ok">entra</span></td><td><code>run-example.sh csharp</code></td></tr>
@@ -305,7 +305,7 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <tbody>
 <tr><td>Arguments</td><td>unknown example, mode or option, missing value</td><td><code>ERROR: ...</code> plus a pointer to <code>--help</code>, exit 2</td></tr>
 <tr><td>Port</td><td>not 1024 to 65535, or 5000</td><td>exit 2. Port 5000 is reserved for AirDrop on macOS</td></tr>
-<tr><td>Provider</td><td><code>saml</code> or <code>oauth2</code></td><td>exit 2: no adapter yet, with the list of providers that work</td></tr>
+<tr><td>Provider</td><td><code>saml</code> with any example other than <code>go</code></td><td>exit 2: those clients need OAuth state and PKCE parameters, with the command that works</td></tr>
 <tr><td>Provider</td><td>vendor provider in mock mode, <code>google</code> in e2e</td><td>exit 2, with the mode that does support it</td></tr>
 <tr><td>Preflight</td><td>missing curl, Go or client toolchain, old Python or JDK</td><td>exit 1, names the tool and how to get it</td></tr>
 <tr><td>Real config</td><td>no <code>.env</code>, or settings fail the check</td><td>exit 2 or 1, with the fix lines. Nothing is started</td></tr>
@@ -503,14 +503,14 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 </svg><figcaption>Figure 5. Launcher execution path. Red boxes are early exits with a one-line message. In mock and e2e the exit trap stops the throw-away gateway on every path.</figcaption></figure>
 
 <h3>4.3 Testing workflow</h3>
-<figure><svg viewBox="0 0 900 330" role="img" aria-labelledby="tw-t tw-d"><title id="tw-t">Testing workflow</title><desc id="tw-d">make test-examples runs the root Go tests, five example suites, tests/e2e.sh with 24 sign-ins and tests/scripts_test.sh with 63 checks. The test gate wraps it and the secrets scan and project audit run alongside.</desc>
+<figure><svg viewBox="0 0 900 330" role="img" aria-labelledby="tw-t tw-d"><title id="tw-t">Testing workflow</title><desc id="tw-d">make test-examples runs the root Go tests, five example suites, tests/e2e.sh with 32 checks and tests/scripts_test.sh with 92 checks. The test gate wraps it and the secrets scan and project audit run alongside.</desc>
 <rect class="bx-a" x="20" y="20" width="200" height="50" rx="5"/><text class="t-s" x="120.0" y="42.0" text-anchor="middle">make test-examples</text><text class="t-s t-m" x="120.0" y="56.0" text-anchor="middle">tests/run_tests.sh</text>
 <rect class="bx" x="280" y="20" width="200" height="50" rx="5"/><text class="t-s" x="380.0" y="42.0" text-anchor="middle">root and 5 example suites</text><text class="t-s t-m" x="380.0" y="56.0" text-anchor="middle">go, cargo, python, mvn, dotnet</text>
 <rect class="bx" x="280" y="100" width="200" height="50" rx="5"/><text class="t-s" x="380.0" y="122.0" text-anchor="middle">tests/e2e.sh</text><text class="t-s t-m" x="380.0" y="136.0" text-anchor="middle">5 clients x 4 providers + 4 negative</text>
-<rect class="bx-o" x="280" y="180" width="200" height="50" rx="5"/><text class="t-s" x="380.0" y="202.0" text-anchor="middle">tests/scripts_test.sh</text><text class="t-s t-m" x="380.0" y="216.0" text-anchor="middle">63 checks, no network</text>
+<rect class="bx-o" x="280" y="180" width="200" height="50" rx="5"/><text class="t-s" x="380.0" y="202.0" text-anchor="middle">tests/scripts_test.sh</text><text class="t-s t-m" x="380.0" y="216.0" text-anchor="middle">92 checks, no network</text>
 <rect class="bx-o" x="540" y="20" width="340" height="50" rx="5"/><text class="t-s" x="710.0" y="42.0" text-anchor="middle">Result: all suites pass</text><text class="t-s t-m" x="710.0" y="56.0" text-anchor="middle">REQUIRE_ALL=1 turns a skipped toolchain into a failure</text>
-<rect class="bx-o" x="540" y="100" width="340" height="50" rx="5"/><text class="t-s" x="710.0" y="122.0" text-anchor="middle">24 PASS lines, 0 skipped</text><text class="t-s t-m" x="710.0" y="136.0" text-anchor="middle">20 sign-ins + 4 refusals</text>
-<rect class="bx-o" x="540" y="180" width="340" height="50" rx="5"/><text class="t-s" x="710.0" y="202.0" text-anchor="middle">29 + 18 + 9 + 7 = 63 passed</text><text class="t-s t-m" x="710.0" y="216.0" text-anchor="middle">checker, usage, helpers, full flows</text>
+<rect class="bx-o" x="540" y="100" width="340" height="50" rx="5"/><text class="t-s" x="710.0" y="122.0" text-anchor="middle">32 PASS lines, 0 skipped</text><text class="t-s t-m" x="710.0" y="136.0" text-anchor="middle">26 sign-ins + 6 refusals</text>
+<rect class="bx-o" x="540" y="180" width="340" height="50" rx="5"/><text class="t-s" x="710.0" y="202.0" text-anchor="middle">53 + 19 + 9 + 11 = 92 passed</text><text class="t-s t-m" x="710.0" y="216.0" text-anchor="middle">checker, usage, helpers, full flows</text>
 <rect class="bx-s" x="20" y="260" width="200" height="50" rx="5"/><text class="t-s" x="120.0" y="282.0" text-anchor="middle">test-gate skill</text><text class="t-s t-m" x="120.0" y="296.0" text-anchor="middle">run_tests.sh, exit 0</text>
 <rect class="bx-s" x="280" y="260" width="200" height="50" rx="5"/><text class="t-s" x="380.0" y="282.0" text-anchor="middle">scan_secrets.sh</text><text class="t-s t-m" x="380.0" y="296.0" text-anchor="middle">no hard-coded secrets</text>
 <rect class="bx-s" x="540" y="260" width="340" height="50" rx="5"/><text class="t-s" x="710.0" y="282.0" text-anchor="middle">audit.sh</text><text class="t-s t-m" x="710.0" y="296.0" text-anchor="middle">scripts executable, docs in Docs/, .gitignore</text>
@@ -528,29 +528,29 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 
 <section id="tests">
 <h2>5. Test coverage</h2>
-<p><code>tests/scripts_test.sh</code> runs <strong>63 checks</strong> and all pass. It needs only bash, openssl, Go and Python 3. It uses no network and no real credentials: env files are generated in a temporary directory and removed on exit. It runs inside <code>tests/run_tests.sh</code>, so the test gate covers it.</p>
+<p><code>tests/scripts_test.sh</code> runs <strong>92 checks</strong> and all pass. It needs only bash, openssl, Go and Python 3. It uses no network and no real credentials: env files are generated in a temporary directory and removed on exit. It runs inside <code>tests/run_tests.sh</code>, so the test gate covers it.</p>
 
-<h3>5.1 Breakdown of the 63 checks</h3>
+<h3>5.1 Breakdown of the 92 checks</h3>
 <div class="tblwrap"><table>
 <thead><tr><th>Group</th><th>Checks</th><th>What is covered</th></tr></thead>
 <tbody>
-<tr><td><code>provider-check.sh</code></td><td>29</td><td>Valid Okta, Auth0 and Entra settings pass (3 &times; 5 checks: pass, redirect URI shown, secret not printed, state secret not printed, second run identical). Sample client id, http issuer, public example state secret, port 5000, multi-tenant warning, non-GUID tenant list, malformed tenant, missing file, unknown provider, no arguments, unknown option</td></tr>
-<tr><td><code>run-example.sh</code> usage and refusals</td><td>18</td><td><code>--list</code> and its five rows, unknown example and mode, port 5000 and port 80, option without a value, mock with a vendor provider, saml and oauth2 refused with the reason, google outside real mode, <code>--check-only</code> builds nothing, <code>--help</code> documents the modes</td></tr>
+<tr><td><code>provider-check.sh</code></td><td>53</td><td>Valid Okta, Auth0, Entra and generic OAuth 2.0 settings pass (4 &times; 5 checks: pass, redirect URI shown, secret not printed, state secret not printed, second run identical). OAuth 2.0 endpoint and auth-style rules (5). SAML (14): valid settings, ACS URL shown, idempotent, sample entity id, no metadata source, http metadata URL, URL and file together, metadata file accepted and rejected, missing file, certificate without key, certificate and key. Sample client id, http issuer, public example state secret, port 5000, multi-tenant warning, non-GUID tenant list, malformed tenant, missing file, unknown provider, no arguments, unknown option</td></tr>
+<tr><td><code>run-example.sh</code> usage and refusals</td><td>19</td><td><code>--list</code> and its five rows, unknown example and mode, port 5000 and port 80, option without a value, mock with a vendor provider, saml refused for the four clients that need state and PKCE (with the reason), saml accepted for go, oauth2 accepted for rust, google outside real mode, <code>--check-only</code> builds nothing, <code>--help</code> documents the modes</td></tr>
 <tr><td>Helpers in <code>sso-common.sh</code></td><td>9</td><td><code>envget</code>: last assignment wins, double and single quotes, inline comment, <code>export</code>, absent key, absent file. <code>is_placeholder</code>: empty, <code>-placeholder</code>, legacy Okta id, and a real id is not a placeholder</td></tr>
-<tr><td>Full launcher flows</td><td>7</td><td>Python in mock mode, then again (idempotency), gateway stopped on exit, Python through the fake Okta in e2e mode, the e2e run labelled as fake, signed in via okta</td></tr>
-<tr><th scope="row">Total</th><th>63</th><th></th></tr>
+<tr><td>Full launcher flows</td><td>11</td><td>Python in mock mode, then again (idempotency), gateway stopped on exit, Python through the fake Okta in e2e mode, the e2e run labelled as fake, signed in via okta, Python through the fake OAuth 2.0 server, and Go through the fake SAML IdP (signed in via saml)</td></tr>
+<tr><th scope="row">Total</th><th>92</th><th></th></tr>
 </tbody></table></div>
 
 <figure>
 <svg viewBox="0 0 900 190" role="img" aria-labelledby="bar-t bar-d">
 <title id="bar-t">Checks per group</title>
-<desc id="bar-d">Bar chart of the 63 script checks: 29 for provider-check, 18 for run-example usage and refusals, 9 for helpers, 7 for full flows.</desc>
-<text class="t-s" x="200" y="34" text-anchor="end">provider-check.sh</text><rect x="210" y="20" width="580" height="20" fill="var(--acc)"/><text class="t-s" x="798" y="35">29</text>
-<text class="t-s" x="200" y="74" text-anchor="end">run-example usage</text><rect x="210" y="60" width="360" height="20" fill="var(--sec)"/><text class="t-s" x="578" y="75">18</text>
-<text class="t-s" x="200" y="114" text-anchor="end">helpers</text><rect x="210" y="100" width="180" height="20" fill="var(--ok)"/><text class="t-s" x="398" y="115">9</text>
-<text class="t-s" x="200" y="154" text-anchor="end">full flows</text><rect x="210" y="140" width="140" height="20" fill="var(--warn)"/><text class="t-s" x="358" y="155">7</text>
+<desc id="bar-d">Bar chart of the 92 script checks: 53 for provider-check, 19 for run-example usage and refusals, 9 for helpers, 11 for full flows.</desc>
+<text class="t-s" x="200" y="34" text-anchor="end">provider-check.sh</text><rect x="210" y="20" width="530" height="20" fill="var(--acc)"/><text class="t-s" x="748" y="35">53</text>
+<text class="t-s" x="200" y="74" text-anchor="end">run-example usage</text><rect x="210" y="60" width="190" height="20" fill="var(--sec)"/><text class="t-s" x="408" y="75">19</text>
+<text class="t-s" x="200" y="114" text-anchor="end">helpers</text><rect x="210" y="100" width="90" height="20" fill="var(--ok)"/><text class="t-s" x="308" y="115">9</text>
+<text class="t-s" x="200" y="154" text-anchor="end">full flows</text><rect x="210" y="140" width="110" height="20" fill="var(--warn)"/><text class="t-s" x="328" y="155">11</text>
 </svg>
-<figcaption>Figure 7. Share of the 63 checks. Bar length is proportional to the count.</figcaption></figure>
+<figcaption>Figure 7. Share of the 92 checks. Bar length is proportional to the count.</figcaption></figure>
 
 <h3>5.2 Modes exercised and results</h3>
 <p>Besides the automated checks, each mode was run by hand during development. The table separates what the suite repeats on every run from what was run once.</p>
@@ -569,7 +569,7 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <tbody>
 <tr><td>Unknown example, unknown mode, option without a value</td><td>exit 2, one-line message</td></tr>
 <tr><td>Port 5000 or a port below 1024</td><td>exit 2</td></tr>
-<tr><td><code>go</code> or <code>rust</code> without <code>--provider</code> in e2e or real</td><td>exit 2: no <code>saml</code> or <code>oauth2</code> adapter yet</td></tr>
+<tr><td><code>saml</code> with <code>python</code>, <code>java</code>, <code>csharp</code> or <code>rust</code></td><td>exit 2: SAML works with the go example only</td></tr>
 <tr><td>Port already used by another program (a Python HTTP server was bound to it)</td><td>exit 1 with <code>--port N</code> advice</td></tr>
 <tr><td>Public example <code>SSO_STATE_SECRET</code>, port 5000 on macOS, sample client id, http issuer, malformed tenant</td><td><code>provider-check.sh</code> exit 1 with a fix per line</td></tr>
 <tr><td>Env file missing</td><td>exit 1, hint <code>cp .env.example .env</code></td></tr>
@@ -577,7 +577,7 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 
 <h3>5.4 Idempotency</h3>
 <ul>
-<li><strong>provider-check.sh</strong> writes nothing. Running it twice on the same file gives the same output and exit code. The suite checks this for all three vendors.</li>
+<li><strong>provider-check.sh</strong> writes nothing. Running it twice on the same file gives the same output and exit code. The suite checks this for Okta, Auth0, Entra, OAuth 2.0 and SAML.</li>
 <li><strong>run-example.sh, mock and e2e:</strong> a second run on the same port replaces the earlier throw-away gateway and succeeds. The suite then checks that nothing is left listening.</li>
 <li><strong>run-example.sh, real:</strong> two consecutive runs gave <code>Application started</code> and then <code>Already running</code> with the same pid, and the sign-in URL was printed both times. <code>stop.sh</code> twice gave <code>Application stopped</code> and then <code>Not running</code>.</li>
 <li><strong>Builds</strong> are incremental, because <code>go</code>, <code>cargo</code>, <code>mvn</code> and <code>dotnet</code> skip unchanged work.</li>
@@ -590,12 +590,12 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <tr><td><code>gofmt -l .</code></td><td><span class="pill p-ok">empty</span></td></tr>
 <tr><td><code>go vet ./...</code> and <code>go vet -tags e2e ./cmd/...</code></td><td><span class="pill p-ok">pass</span></td></tr>
 <tr><td><code>go test -race ./...</code></td><td><span class="pill p-ok">pass</span></td></tr>
-<tr><td><code>REQUIRE_ALL=1 tests/run_tests.sh</code></td><td><span class="pill p-ok">exit 0</span>, 24 end-to-end passes, 63 script checks, 0 skipped</td></tr>
+<tr><td><code>REQUIRE_ALL=1 tests/run_tests.sh</code></td><td><span class="pill p-ok">exit 0</span>, 32 end-to-end passes, 92 script checks, 0 skipped</td></tr>
 <tr><td>test gate (<code>run_tests.sh</code>)</td><td><span class="pill p-ok">exit 0</span></td></tr>
 <tr><td>secrets scan, project audit</td><td><span class="pill p-ok">OK</span>, <span class="pill p-ok">AUDIT PASSED</span></td></tr>
 <tr><td>Google credential shape scan</td><td><span class="pill p-ok">no matches</span></td></tr>
 </tbody></table></div>
-<p class="mut"><code>shellcheck</code> is not installed on the development machine, so the scripts were checked with <code>bash -n</code> and the 63 tests only.</p>
+<p class="mut"><code>shellcheck</code> is not installed on the development machine, so the scripts were checked with <code>bash -n</code> and the 92 tests only.</p>
 </section>
 
 <section id="integration">
@@ -607,7 +607,7 @@ footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-ali
 <tbody>
 <tr><td><code>make run-example EX=&lt;example&gt; [MODE=] [PROVIDER=]</code></td><td><code>scripts/run-example.sh $(EX) --mode $(MODE or mock)</code></td><td>Refuses to run without <code>EX</code></td></tr>
 <tr><td><code>make provider-check P=&lt;okta|auth0|azure&gt;</code></td><td><code>scripts/provider-check.sh $(P)</code></td><td>Refuses to run without <code>P</code></td></tr>
-<tr><td><code>make test-scripts</code></td><td><code>bash tests/scripts_test.sh</code></td><td>63 checks</td></tr>
+<tr><td><code>make test-scripts</code></td><td><code>bash tests/scripts_test.sh</code></td><td>92 checks</td></tr>
 <tr><td><code>make test-examples</code></td><td><code>bash tests/run_tests.sh</code></td><td>Includes the script checks as the last suite</td></tr>
 <tr><td><code>make test-e2e</code></td><td><code>bash tests/e2e.sh</code></td><td>Fake IdPs, port 18931</td></tr>
 <tr><td><code>make start</code>, <code>stop</code>, <code>restart</code>, <code>clean</code></td><td><code>scripts/start.sh</code>, <code>stop.sh</code>, <code>cleanup.sh</code></td><td>Project gateway lifecycle</td></tr>

@@ -6,23 +6,23 @@ Five self-contained command-line clients for the Universal SSO gateway (`ssod`),
 
 These examples are **clients of the gateway**. They do not implement OAuth, OIDC or SAML themselves, and they hold no client ids, secrets or tokens. The gateway owns the signed state, PKCE verifier, nonce, client secret and tokens.
 
-The gateway implements `mock`, `google`, and (when configured) `okta`, `auth0` and `azure` (Microsoft Entra ID). The SAML 2.0 and generic OAuth 2.0 adapters are **planned**.
+The gateway implements `mock`, `google`, and (when configured) `okta`, `auth0`, `azure` (Microsoft Entra ID), generic `oauth2` and `saml`. Okta, Auth0, Entra, OAuth 2.0 and SAML 2.0 were tested only against in-process fake IdPs, never a live tenant. **SAML works end to end with the Go client only**: the other four clients require the OAuth `state` and PKCE parameters, which a SAML redirect (`SAMLRequest` and `RelayState`) does not carry. SAML does not support encrypted assertions, IdP-initiated SSO or Single Logout.
 
-Every client works with every implemented provider. Pick one with `SSO_PROVIDER`:
+Every client works with every implemented provider except `saml`, which only the Go client supports. Pick one with `SSO_PROVIDER`:
 
 | Example | Default provider | Other providers |
 |---|---|---|
-| [`examples/oauth2-rust`](../examples/oauth2-rust/README.md) | `oauth2` | any of `mock`, `okta`, `auth0`, `azure`, `google` |
-| [`examples/saml2-go`](../examples/saml2-go/README.md) | `saml` | same |
+| [`examples/oauth2-rust`](../examples/oauth2-rust/README.md) | `oauth2` | any of `mock`, `okta`, `auth0`, `azure`, `google` (not `saml`) |
+| [`examples/saml2-go`](../examples/saml2-go/README.md) | `saml` | same, and the only client that supports `saml` |
 | [`examples/auth0-python`](../examples/auth0-python/README.md) | `auth0` | same |
 | [`examples/okta-java`](../examples/okta-java/README.md) | `okta` | same |
 | [`examples/azure-ad-csharp`](../examples/azure-ad-csharp/README.md) | `azure` | same |
 
-The default of a client is the provider it is named after. For `oauth2` and `saml` there is no gateway adapter yet, so those two defaults answer `404 PROVIDER_NOT_FOUND`, which the client reports clearly. Set `SSO_PROVIDER` to an implemented provider to use them today.
+The default of a client is the provider it is named after. The `oauth2` and `saml` defaults need the matching adapter to be configured in the gateway (`SSO_PROVIDERS_OAUTH2_*`, `SSO_PROVIDERS_SAML_*`). Otherwise the gateway answers `404 PROVIDER_NOT_FOUND`, which the client reports clearly.
 
 ## End-to-end check
 
-`bash tests/e2e.sh` builds the gateway with `-tags e2e`, which mounts in-process **fake** OIDC servers (`pkg/sso/oidc/oidctest`) for Okta, Auth0 and Entra on the gateway's own port. It then runs all five clients against `okta`, `auth0`, `azure` and `mock` (20 sign-ins, each must print `signed in via <provider>`) plus four negative checks (forged state, missing state, unknown provider, a code the IdP never issued). A missing toolchain is a failure, not a skip, unless `E2E_ALLOW_SKIP=1`.
+`bash tests/e2e.sh` builds the gateway with `-tags e2e`, which mounts in-process **fake** identity providers on the gateway's own port: OIDC servers (`pkg/sso/oidc/oidctest`) for Okta, Auth0 and Entra, a generic OAuth 2.0 server (`pkg/sso/oauth2/oauth2test`) and a SAML 2.0 IdP (`pkg/sso/saml/samltest`). It then runs all five clients against `okta`, `auth0`, `azure`, `oauth2` and `mock` (25 sign-ins), and the Go client against `saml` (1 sign-in: it follows the IdP's auto-post form back to the gateway only). Each must print `signed in via <provider>`. Six negative checks follow: four GET checks (forged state, missing state, unknown provider, a code the IdP never issued) and two SAML POST checks (forged and missing `RelayState`, both must answer 400). Expected result: 32 passed, 0 failed. A missing toolchain is a failure, not a skip, unless `E2E_ALLOW_SKIP=1`.
 
 What this proves: the adapters, the gateway and the five clients work together over HTTP, including authorization code with PKCE, token exchange, ID token verification and nonce. **What it does not prove:** that a real Okta, Auth0 or Entra tenant accepts your configuration. The fake approves every request and never asks a person to sign in. A real sign-in needs your tenant, your credentials and a browser, and follows the matching `Docs/*-SSO-Setup.md` guide. The `-tags e2e` binary is for tests only and must never be deployed.
 
@@ -36,11 +36,11 @@ Three scripts in `scripts/` automate the sequence that `make google-check` and `
 
 | Script | Purpose | Trigger |
 |---|---|---|
-| `scripts/provider-check.sh <okta\|auth0\|azure> [--env FILE] [--online]` | Validate the vendor settings in `.env`: state secret, client id and secret not samples, https issuer, tenant GUID or domain, redirect URI path. `--online` also fetches the discovery document. Never prints a secret. | `make provider-check P=okta` |
+| `scripts/provider-check.sh <okta\|auth0\|azure\|oauth2\|saml> [--env FILE] [--online]` | Validate the vendor settings in `.env`: state secret, client id and secret not samples (SAML: entity id, IdP metadata URL or file, SP certificate and key pairing), https issuer, tenant GUID or domain, redirect URI path. `--online` also fetches the discovery document. Never prints a secret. | `make provider-check P=okta` |
 | `scripts/run-example.sh <example> [--mode M] [--provider ID]` | Preflight the toolchain, build `ssod` and the client, start a gateway, confirm the provider is registered, run `check` and `login`. | `make run-example EX=python` |
 | `scripts/sso-common.sh` | Shared helpers (`.env` reader, placeholder rules). Sourced, not run. | by the two above |
 
-The full design (architecture, per-mode sequence diagrams, execution flowchart, the 63 script checks, Makefile and lifecycle integration, prerequisites and launch scenarios) is in [`Launcher-Implementation.html`](Launcher-Implementation.html).
+The full design (architecture, per-mode sequence diagrams, execution flowchart, the 92 script checks, Makefile and lifecycle integration, prerequisites and launch scenarios) is in [`Launcher-Implementation.html`](Launcher-Implementation.html).
 
 Modes of `run-example.sh`:
 
@@ -58,7 +58,7 @@ scripts/run-example.sh csharp --mode real --provider azure      # your tenant, b
 make stop                                                       # stop the real-mode gateway
 ```
 
-Defaults: rust `oauth2`, go `saml`, python `auth0`, java `okta`, csharp `azure`. SAML and generic OAuth 2.0 have no gateway adapter yet, so pass `--provider` for rust and go. Prerequisites per example are the toolchains listed under "Run the tests". The scripts never print `.env` values, and a throw-away gateway is stopped when the script exits (`--keep-running` keeps it). `bash tests/scripts_test.sh` tests them with generated env files (63 checks). Real mode only reaches the sign-in page: it has not been run against a live Okta, Auth0 or Entra tenant.
+Defaults: rust `oauth2`, go `saml`, python `auth0`, java `okta`, csharp `azure`. `saml` is accepted for the Go example only; the other four examples reject it. Prerequisites per example are the toolchains listed under "Run the tests". The scripts never print `.env` values, and a throw-away gateway is stopped when the script exits (`--keep-running` keeps it). `bash tests/scripts_test.sh` tests them with generated env files (92 checks). Real mode only reaches the sign-in page: it has not been run against a live Okta, Auth0 or Entra tenant.
 
 ## What each client does
 
