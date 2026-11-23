@@ -111,7 +111,7 @@ If the console does not offer this, create a new client instead (section 3.1) an
 
 This is the expected result of `make google-url` when `ssod` is not running: the page at `localhost:8080` has no server behind it. The code you need is in the **address bar** of that error page. Copy the whole URL, including `?state=...&code=...`.
 
-If `ssod` is running (`make start`), the same URL reaches the server and answers `404 PROVIDER_NOT_FOUND`, because the Google provider is not registered yet. The address bar still contains the code, so the exchange works the same way. Stop the server first (`make stop`) if the 404 page confuses you.
+If `ssod` is running (`make start`), the same URL reaches the server. The callback endpoint then completes the login itself and returns the profile as JSON, which uses up the single-use code. If you still want to run the exchange by hand, stop the server first (`make stop`) so the code in the address bar stays unused.
 
 ### S5. Test users and "Access blocked"
 
@@ -338,7 +338,7 @@ Rules for this file:
 | Redirect URI | The `redirect_uri` parameter of both the authorization request and the token request. Both must match Google's registered value |
 | State secret | Signs and verifies the `state` value (see [`pkg/sso/state.go`](../pkg/sso/state.go)) |
 
-Planned, not yet implemented: restricting sign-in to one Google Workspace domain. When added, the server must check the ID token's `hd` claim, not only pass the `hd` request parameter, because the request parameter is only a UI hint that a client can alter.
+Optional: set `SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN` to restrict sign-in to one Google Workspace domain. The provider passes it as the `hd` request parameter (a UI hint only) and then enforces it by checking the ID token's `hd` claim (`checkDomain` in [`pkg/sso/google/provider.go`](../pkg/sso/google/provider.go)).
 
 ---
 

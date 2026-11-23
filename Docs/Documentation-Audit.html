@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Universal SSO - documentation audit</title><style>
+:root{--bg:#fff;--surf:#f7f8fa;--bd:#e5e7eb;--tx:#1f2328;--mut:#57606a;--acc:#3b82d4;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;--code:#0d1117;--codefg:#e6edf3}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--surf:#161b22;--bd:#30363d;--tx:#e6edf3;--mut:#9da7b3;--acc:#58a6ff;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--code:#010409}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.6 -apple-system,"Segoe UI",system-ui,sans-serif}
+header,main,footer{max-width:1100px;margin:0 auto;padding:0 20px}header{padding-top:28px}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:18px;margin:34px 0 10px;padding-top:10px;border-top:1px solid var(--bd)}h3{font-size:15px;margin:18px 0 6px}
+.mut{color:var(--mut)}.meta{font-size:12px;color:var(--mut)}
+nav{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--bd);z-index:5}nav .in{max-width:1100px;margin:0 auto;padding:8px 20px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.notice{border:1px solid var(--warn);border-left-width:4px;background:var(--surf);padding:12px 16px;border-radius:6px;margin:16px 0}
+.notice b{color:var(--warn)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:14px 0}.card{background:var(--surf);border:1px solid var(--bd);border-radius:6px;padding:10px 14px}.card .n{font-size:24px;font-weight:600}.card .l{font-size:12px;color:var(--mut)}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}th,td{border:1px solid var(--bd);padding:6px 10px;text-align:left;vertical-align:top}th{background:var(--surf);cursor:pointer;user-select:none;white-space:nowrap}th:hover{color:var(--acc)}th[aria-sort=ascending]::after{content:" \25B2";font-size:10px}th[aria-sort=descending]::after{content:" \25BC";font-size:10px}
+.tools{display:flex;gap:10px;align-items:center;margin:6px 0;flex-wrap:wrap}input[type=search],select{padding:5px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font:inherit}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;border:1px solid}.p-ok{color:var(--ok);border-color:var(--ok)}.p-bad{color:var(--bad);border-color:var(--bad)}.p-warn{color:var(--warn);border-color:var(--warn)}.p-mut{color:var(--mut);border-color:var(--bd)}
+pre{background:var(--code);color:var(--codefg);padding:12px 14px;border-radius:6px;overflow:auto;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:6px 0}
+code{font:12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}p code,td code,li code{background:var(--surf);border:1px solid var(--bd);padding:0 4px;border-radius:3px}
+.t-kw{color:#ff7b72}.t-ty{color:#79c0ff}.t-st{color:#a5d6ff}.t-cm{color:#8b949e;font-style:italic}.t-nu{color:#d2a8ff}.t-fn{color:#d2a8ff}
+details{border:1px solid var(--bd);border-radius:6px;margin:10px 0;background:var(--surf)}summary{cursor:pointer;padding:8px 12px;font-weight:600}details .body{padding:0 12px 10px}.path{font-size:12px;color:var(--mut)}
+.copy{float:right;margin:6px 6px 0 0;font-size:12px;padding:2px 8px;border:1px solid var(--bd);background:var(--surf);color:var(--tx);border-radius:4px;cursor:pointer}
+.chart{width:100%;height:auto}.legend{font-size:12px;color:var(--mut);margin:4px 0}
+.tl{display:flex;flex-direction:column;gap:6px;margin:10px 0}.tl .row{display:grid;grid-template-columns:150px 1fr 70px;gap:10px;align-items:center}.tl .bar{height:20px;border-radius:3px;min-width:3px}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0}.flow .box{padding:6px 10px;border:2px solid;border-radius:6px;font-size:12px;background:var(--surf)}.flow .arr{color:var(--mut)}
+footer{padding:30px 20px;margin-top:40px;border-top:1px solid var(--bd);text-align:center;font-size:12px;color:var(--mut)}
+@media print{nav,.copy,.tools{display:none}details{border:0}}
+</style></head><body>
+<nav><div class="in"><a href="#summary">Summary</a><a href="#matrix">Status matrix</a><a href="#code">Adapter code</a><a href="#schema">Configuration</a><a href="#validation">Validation</a><a href="#findings">Outdated &amp; open</a></div></nav>
+<header><h1>Universal SSO documentation audit</h1>
+<div class="meta">Commit <code>86e3af3</code> on <code>main</code> &middot; compared with <code>1aab4b0</code> &middot; generated 2026-11-23 14:32 CET by <code>scripts/build_audit_dashboard.py</code> &middot; <span class="pill p-bad">0 GATE(S) NEED ATTENTION</span></div></header>
+<main>
+<section id="summary"><h2>1. Summary</h2>
+<div class="notice"><b>Scope of verification.</b> The Okta, Auth0 and Microsoft Entra ID adapters were tested against an <b>in-process fake identity provider</b> (<code>pkg/sso/oidc/oidctest</code>), not against live tenant credentials. The unit tests and <code>tests/e2e.sh</code> prove that the adapters, the gateway and the five example clients work together over HTTP. They do <b>not</b> prove that a real Okta, Auth0 or Entra tenant accepts your configuration. A real sign-in needs your tenant, credentials and a browser, and follows the matching <code>Docs/*-SSO-Setup.md</code> guide.</div>
+<div class="cards">
+<div class="card"><div class="n">0/7</div><div class="l">validation gates passed</div></div>
+<div class="card"><div class="n">15</div><div class="l">documentation files changed</div></div>
+<div class="card"><div class="n">+195 / -51</div><div class="l">documentation lines</div></div>
+<div class="card"><div class="n">0</div><div class="l">outdated pages found</div></div>
+<div class="card"><div class="n">6</div><div class="l">open items</div></div>
+</div>
+<p>The Okta, Auth0 and Entra guides, README, Quickstart, Architecture, Examples and the five example READMEs now describe the adapters as implemented and fake-IdP tested. SAML 2.0 and generic OAuth 2.0 are still planned, and their guides say so correctly.</p></section>
+
+<section id="matrix"><h2>2. Documentation status matrix</h2>
+<p class="mut">Changes since <code>1aab4b0</code>, measured with <code>git diff --numstat</code>. Click a column header to sort.</p>
+<div class="tools"><input type="search" placeholder="filter files or sections" aria-label="Filter documentation table" data-filter="t-docs"></div>
+<table class="sortable" id="t-docs"><thead><tr><th scope="col" data-type="str">File</th><th scope="col" data-type="str">Type</th><th scope="col" data-type="num">Added</th><th scope="col" data-type="num">Removed</th><th scope="col" data-type="str">Sections modified</th><th scope="col" data-type="str">Status</th></tr></thead><tbody><tr><td data-v=".env.example"><code>.env.example</code></td><td data-v="config">config</td><td data-v="9">+9</td><td data-v="1">-1</td><td data-v="Okta sample id is now a placeholder, new optional variables documented">Okta sample id is now a placeholder, new optional variables documented</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Docs/Architecture.md"><code>Docs/Architecture.md</code></td><td data-v="guide">guide</td><td data-v="30">+30</td><td data-v="1">-1</td><td data-v="New &#x27;OIDC vendor adapters&#x27; and &#x27;Verification boundary&#x27; sections, diagram">New &#x27;OIDC vendor adapters&#x27; and &#x27;Verification boundary&#x27; sections, diagram</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Docs/Auth0-SSO-Setup.md"><code>Docs/Auth0-SSO-Setup.md</code></td><td data-v="guide">guide</td><td data-v="12">+12</td><td data-v="9">-9</td><td data-v="Status note, 404 row, trailing-slash issuer, AUDIENCE and ROLES_CLAIM variables">Status note, 404 row, trailing-slash issuer, AUDIENCE and ROLES_CLAIM variables</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Docs/Azure-AD-SSO-Setup.md"><code>Docs/Azure-AD-SSO-Setup.md</code></td><td data-v="guide">guide</td><td data-v="14">+14</td><td data-v="10">-10</td><td data-v="Status note, tenant pinning, ALLOWED_TENANTS and AUTHORITY variables">Status note, tenant pinning, ALLOWED_TENANTS and AUTHORITY variables</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Docs/Examples.md"><code>Docs/Examples.md</code></td><td data-v="guide">guide</td><td data-v="91">+91</td><td data-v="0">-0</td><td data-v="Rewrote &#x27;Read this first&#x27;, added &#x27;End-to-end check&#x27;">Rewrote &#x27;Read this first&#x27;, added &#x27;End-to-end check&#x27;</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Docs/Google-SSO-Setup.md"><code>Docs/Google-SSO-Setup.md</code></td><td data-v="guide">guide</td><td data-v="2">+2</td><td data-v="2">-2</td><td data-v="S4 no longer says Google is unregistered, hosted-domain restriction documented as implemented">S4 no longer says Google is unregistered, hosted-domain restriction documented as implemented</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Docs/Okta-SSO-Setup.md"><code>Docs/Okta-SSO-Setup.md</code></td><td data-v="guide">guide</td><td data-v="10">+10</td><td data-v="10">-10</td><td data-v="Status note, 404 row, security-control rows, planned-adapter wording">Status note, 404 row, security-control rows, planned-adapter wording</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Docs/Quickstart.md"><code>Docs/Quickstart.md</code></td><td data-v="guide">guide</td><td data-v="7">+7</td><td data-v="6">-6</td><td data-v="Provider status table, scope paragraph, troubleshooting, next steps">Provider status table, scope paragraph, troubleshooting, next steps</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="Makefile"><code>Makefile</code></td><td data-v="config">config</td><td data-v="4">+4</td><td data-v="1">-1</td><td data-v="Added test-e2e target">Added test-e2e target</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="README.md"><code>README.md</code></td><td data-v="readme">readme</td><td data-v="11">+11</td><td data-v="6">-6</td><td data-v="Status line, workflow diagram node, provider table, scope paragraph">Status line, workflow diagram node, provider table, scope paragraph</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="examples/auth0-python/README.md"><code>examples/auth0-python/README.md</code></td><td data-v="example README">example README</td><td data-v="1">+1</td><td data-v="1">-1</td><td data-v="&#x27;Read this first&#x27; banner replaced (adapter no longer planned)">&#x27;Read this first&#x27; banner replaced (adapter no longer planned)</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="examples/azure-ad-csharp/README.md"><code>examples/azure-ad-csharp/README.md</code></td><td data-v="example README">example README</td><td data-v="1">+1</td><td data-v="1">-1</td><td data-v="&#x27;Read this first&#x27; banner replaced (adapter no longer planned)">&#x27;Read this first&#x27; banner replaced (adapter no longer planned)</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="examples/oauth2-rust/README.md"><code>examples/oauth2-rust/README.md</code></td><td data-v="example README">example README</td><td data-v="1">+1</td><td data-v="1">-1</td><td data-v="&#x27;Read this first&#x27; banner replaced (adapter no longer planned)">&#x27;Read this first&#x27; banner replaced (adapter no longer planned)</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="examples/okta-java/README.md"><code>examples/okta-java/README.md</code></td><td data-v="example README">example README</td><td data-v="1">+1</td><td data-v="1">-1</td><td data-v="&#x27;Read this first&#x27; banner replaced (adapter no longer planned)">&#x27;Read this first&#x27; banner replaced (adapter no longer planned)</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr><tr><td data-v="examples/saml2-go/README.md"><code>examples/saml2-go/README.md</code></td><td data-v="example README">example README</td><td data-v="1">+1</td><td data-v="1">-1</td><td data-v="&#x27;Read this first&#x27; banner replaced (adapter no longer planned)">&#x27;Read this first&#x27; banner replaced (adapter no longer planned)</td><td data-v="updated"><span class="pill p-ok">updated</span></td></tr></tbody></table>
+<h3>Lines changed per file</h3><div class="legend"><span style="color:var(--ok)">&#9632;</span> added &nbsp; <span style="color:var(--bad)">&#9632;</span> removed</div><div id="chart-docs"></div></section>
+
+<section id="code"><h2>3. Adapter implementation</h2>
+<p class="mut">Excerpts are cut from the real source files when the page is built, so they match the committed code. The three vendor packages are thin layers over <code>pkg/sso/oidc</code>.</p>
+<details open><summary>Okta: thin vendor layer <span class="path">pkg/sso/okta/provider.go:51</span></summary><div class="body"><p class="mut">Maps groups and preferred_username. Issuer pinning comes from the shared base.</p><button class="copy" type="button">copy</button><pre><code class="lang-go"><span class="t-kw">func</span> <span class="t-ty">New</span>(cfg <span class="t-ty">Config</span>) (*oidc.<span class="t-ty">Provider</span>, <span class="t-ty">error</span>) {
+	<span class="t-kw">if</span> cfg.<span class="t-ty">ID</span> == <span class="t-st">&quot;&quot;</span> {
+		cfg.<span class="t-ty">ID</span> = <span class="t-ty">DriverName</span>
+	}
+	<span class="t-kw">return</span> oidc.<span class="t-ty">New</span>(oidc.<span class="t-ty">Config</span>{
+		<span class="t-ty">ID</span>: cfg.<span class="t-ty">ID</span>, <span class="t-ty">Name</span>: <span class="t-st">&quot;Okta&quot;</span>,
+		<span class="t-ty">ClientID</span>: cfg.<span class="t-ty">ClientID</span>, <span class="t-ty">ClientSecret</span>: cfg.<span class="t-ty">ClientSecret</span>, <span class="t-ty">RedirectURL</span>: cfg.<span class="t-ty">RedirectURL</span>,
+		<span class="t-ty">Issuer</span>: cfg.<span class="t-ty">IssuerURL</span>, <span class="t-ty">DiscoveryURL</span>: cfg.<span class="t-ty">DiscoveryURL</span>, <span class="t-ty">Scopes</span>: cfg.<span class="t-ty">Scopes</span>,
+		<span class="t-ty">HTTPClient</span>: cfg.<span class="t-ty">HTTPClient</span>,
+		<span class="t-ty">MapUser</span>: <span class="t-kw">func</span>(raw <span class="t-kw">map</span>[<span class="t-ty">string</span>]<span class="t-ty">any</span>, u *sso.<span class="t-ty">UserInfo</span>) {
+			<span class="t-kw">if</span> v := oidc.<span class="t-ty">String</span>(raw, <span class="t-st">&quot;preferred_username&quot;</span>); v != <span class="t-st">&quot;&quot;</span> {
+				u.<span class="t-ty">Username</span> = v
+			}
+			u.<span class="t-ty">Groups</span> = oidc.<span class="t-ty">Strings</span>(raw, <span class="t-st">&quot;groups&quot;</span>)
+			u.<span class="t-ty">TenantID</span> = strings.<span class="t-ty">TrimRight</span>(oidc.<span class="t-ty">String</span>(raw, <span class="t-st">&quot;iss&quot;</span>), <span class="t-st">&quot;/&quot;</span>)
+		},
+	})
+}</code></pre></div></details><details><summary>Auth0: slash issuer, audience, roles, logout <span class="path">pkg/sso/auth0/provider.go:59</span></summary><div class="body"><p class="mut">Appends the trailing slash Auth0 puts in every iss. /v2/logout replaces end_session_endpoint.</p><button class="copy" type="button">copy</button><pre><code class="lang-go"><span class="t-kw">func</span> <span class="t-ty">New</span>(cfg <span class="t-ty">Config</span>) (*oidc.<span class="t-ty">Provider</span>, <span class="t-ty">error</span>) {
+	<span class="t-kw">if</span> cfg.<span class="t-ty">ID</span> == <span class="t-st">&quot;&quot;</span> {
+		cfg.<span class="t-ty">ID</span> = <span class="t-ty">DriverName</span>
+	}
+	<span class="t-kw">if</span> cfg.<span class="t-ty">RolesClaim</span> == <span class="t-st">&quot;&quot;</span> {
+		cfg.<span class="t-ty">RolesClaim</span> = <span class="t-st">&quot;roles&quot;</span>
+	}
+	issuer := cfg.<span class="t-ty">IssuerURL</span>
+	<span class="t-kw">if</span> issuer != <span class="t-st">&quot;&quot;</span> &amp;&amp; !strings.<span class="t-ty">HasSuffix</span>(issuer, <span class="t-st">&quot;/&quot;</span>) {
+		issuer += <span class="t-st">&quot;/&quot;</span> <span class="t-cm">// Auth0 issuers always end with a slash</span>
+	}
+	extra := <span class="t-kw">map</span>[<span class="t-ty">string</span>]<span class="t-ty">string</span>{}
+	<span class="t-kw">if</span> cfg.<span class="t-ty">Audience</span> != <span class="t-st">&quot;&quot;</span> {
+		extra[<span class="t-st">&quot;audience&quot;</span>] = cfg.<span class="t-ty">Audience</span>
+	}
+	<span class="t-kw">return</span> oidc.<span class="t-ty">New</span>(oidc.<span class="t-ty">Config</span>{
+		<span class="t-ty">ID</span>: cfg.<span class="t-ty">ID</span>, <span class="t-ty">Name</span>: <span class="t-st">&quot;Auth0&quot;</span>,
+		<span class="t-ty">ClientID</span>: cfg.<span class="t-ty">ClientID</span>, <span class="t-ty">ClientSecret</span>: cfg.<span class="t-ty">ClientSecret</span>, <span class="t-ty">RedirectURL</span>: cfg.<span class="t-ty">RedirectURL</span>,
+		<span class="t-ty">Issuer</span>: issuer, <span class="t-ty">DiscoveryURL</span>: cfg.<span class="t-ty">DiscoveryURL</span>, <span class="t-ty">Scopes</span>: cfg.<span class="t-ty">Scopes</span>,
+		<span class="t-ty">HTTPClient</span>: cfg.<span class="t-ty">HTTPClient</span>, <span class="t-ty">ExtraAuthParams</span>: extra,
+		<span class="t-ty">MapUser</span>: <span class="t-kw">func</span>(raw <span class="t-kw">map</span>[<span class="t-ty">string</span>]<span class="t-ty">any</span>, u *sso.<span class="t-ty">UserInfo</span>) {
+			<span class="t-kw">if</span> v := oidc.<span class="t-ty">String</span>(raw, <span class="t-st">&quot;nickname&quot;</span>); v != <span class="t-st">&quot;&quot;</span> {
+				u.<span class="t-ty">Username</span> = v
+			}
+			u.<span class="t-ty">Roles</span> = oidc.<span class="t-ty">Strings</span>(raw, cfg.<span class="t-ty">RolesClaim</span>)
+			u.<span class="t-ty">Groups</span> = oidc.<span class="t-ty">Strings</span>(raw, <span class="t-st">&quot;groups&quot;</span>)
+			u.<span class="t-ty">TenantID</span> = oidc.<span class="t-ty">String</span>(raw, <span class="t-st">&quot;org_id&quot;</span>)
+		},
+		<span class="t-cm">// Auth0 does not use end_session_endpoint for its default tenant</span>
+		<span class="t-cm">// domain: logout is &lt;issuer&gt;v2/logout?client_id=...&amp;returnTo=...</span>
+		<span class="t-ty">LogoutURL</span>: <span class="t-kw">func</span>(req sso.<span class="t-ty">LogoutRequest</span>) (<span class="t-ty">string</span>, <span class="t-ty">error</span>) {
+			q := url.<span class="t-ty">Values</span>{<span class="t-st">&quot;client_id&quot;</span>: {cfg.<span class="t-ty">ClientID</span>}}
+			<span class="t-kw">if</span> req.<span class="t-ty">PostLogoutURL</span> != <span class="t-st">&quot;&quot;</span> {
+				q.<span class="t-ty">Set</span>(<span class="t-st">&quot;returnTo&quot;</span>, req.<span class="t-ty">PostLogoutURL</span>)
+			}
+			<span class="t-kw">return</span> issuer + <span class="t-st">&quot;v2/logout?&quot;</span> + q.<span class="t-ty">Encode</span>(), <span class="t-kw">nil</span>
+		},
+	})
+}</code></pre></div></details><details><summary>Entra: tenant pinning for multi-tenant endpoints <span class="path">pkg/sso/entra/provider.go:131</span></summary><div class="body"><p class="mut">For common, organizations and consumers, the issuer must equal &lt;authority&gt;/&lt;tid&gt;/v2.0 for the token&#x27;s own tid.</p><button class="copy" type="button">copy</button><pre><code class="lang-go">	<span class="t-kw">switch</span> {
+	<span class="t-kw">case</span> multi:
+		oc.<span class="t-ty">AcceptDiscoveryIssuer</span> = <span class="t-kw">func</span>(iss <span class="t-ty">string</span>) <span class="t-ty">bool</span> { <span class="t-kw">return</span> iss == host+<span class="t-st">&quot;{tenantid}/v2.0&quot;</span> }
+		oc.<span class="t-ty">AcceptIssuer</span> = <span class="t-kw">func</span>(tokenIss, _ <span class="t-ty">string</span>, claims <span class="t-kw">map</span>[<span class="t-ty">string</span>]<span class="t-ty">any</span>) <span class="t-ty">bool</span> {
+			tid := oidc.<span class="t-ty">String</span>(claims, <span class="t-st">&quot;tid&quot;</span>)
+			<span class="t-kw">if</span> !guidRe.<span class="t-ty">MatchString</span>(tid) || tokenIss != host+tid+<span class="t-st">&quot;/v2.0&quot;</span> {
+				<span class="t-kw">return</span> <span class="t-kw">false</span>
+			}
+			<span class="t-kw">return</span> len(allowed) == <span class="t-nu">0</span> || allowed[strings.<span class="t-ty">ToLower</span>(tid)]
+		}
+	<span class="t-kw">case</span> !single:
+		<span class="t-cm">// Tenant domain: discovery announces the GUID issuer, which then pins tokens.</span>
+		oc.<span class="t-ty">AcceptDiscoveryIssuer</span> = <span class="t-kw">func</span>(iss <span class="t-ty">string</span>) <span class="t-ty">bool</span> {
+			<span class="t-kw">return</span> strings.<span class="t-ty">HasPrefix</span>(iss, host) &amp;&amp; strings.<span class="t-ty">HasSuffix</span>(iss, <span class="t-st">&quot;/v2.0&quot;</span>) &amp;&amp;
+				guidRe.<span class="t-ty">MatchString</span>(strings.<span class="t-ty">TrimSuffix</span>(strings.<span class="t-ty">TrimPrefix</span>(iss, host), <span class="t-st">&quot;/v2.0&quot;</span>))
+		}
+	}
+	<span class="t-kw">return</span> oidc.<span class="t-ty">New</span>(oc)
+}</code></pre></div></details><details><summary>Shared base: ID token verification <span class="path">pkg/sso/oidc/provider.go:265</span></summary><div class="body"><p class="mut">RS256 only. Checks signature, issuer, audience, exp, nbf and subject. The nonce is checked in HandleCallback.</p><button class="copy" type="button">copy</button><pre><code class="lang-go"><span class="t-kw">func</span> (p *<span class="t-ty">Provider</span>) verifyIDToken(ctx context.<span class="t-ty">Context</span>, token <span class="t-ty">string</span>) (*parsedJWT, <span class="t-ty">error</span>) {
+	d, err := p.endpoints(ctx)
+	<span class="t-kw">if</span> err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, err
+	}
+	j, err := parseJWT(token)
+	<span class="t-kw">if</span> err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, sso.<span class="t-ty">ErrTokenValidation</span>(p.errf(<span class="t-st">&quot;invalid id token&quot;</span>), err)
+	}
+	pub, err := p.key(ctx, d, j.header.<span class="t-ty">Kid</span>)
+	<span class="t-kw">if</span> err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, err
+	}
+	<span class="t-kw">if</span> err := j.verify(pub); err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, sso.<span class="t-ty">NewError</span>(sso.<span class="t-ty">ErrCodeSignatureInvalid</span>, p.errf(<span class="t-st">&quot;id token signature invalid&quot;</span>), http.<span class="t-ty">StatusUnauthorized</span>, <span class="t-kw">nil</span>)
+	}
+	c, now := j.claims, p.now()
+	<span class="t-kw">switch</span> {
+	<span class="t-kw">case</span> !p.issuerOK(c.<span class="t-ty">Issuer</span>, d, j.raw):
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, sso.<span class="t-ty">ErrTokenValidation</span>(p.errf(<span class="t-st">&quot;unexpected issuer&quot;</span>), <span class="t-kw">nil</span>)
+	<span class="t-kw">case</span> !c.<span class="t-ty">Audience</span>.contains(p.cfg.<span class="t-ty">ClientID</span>):
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, sso.<span class="t-ty">ErrTokenValidation</span>(p.errf(<span class="t-st">&quot;audience mismatch&quot;</span>), <span class="t-kw">nil</span>)
+	<span class="t-kw">case</span> c.<span class="t-ty">ExpiresAt</span> == <span class="t-nu">0</span> || now.<span class="t-ty">After</span>(time.<span class="t-ty">Unix</span>(c.<span class="t-ty">ExpiresAt</span>, <span class="t-nu">0</span>).<span class="t-ty">Add</span>(clockSkew)):
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, sso.<span class="t-ty">NewError</span>(sso.<span class="t-ty">ErrCodeTokenExpired</span>, p.errf(<span class="t-st">&quot;id token expired&quot;</span>), http.<span class="t-ty">StatusUnauthorized</span>, <span class="t-kw">nil</span>)
+	<span class="t-kw">case</span> c.<span class="t-ty">NotBefore</span> != <span class="t-nu">0</span> &amp;&amp; now.<span class="t-ty">Add</span>(clockSkew).<span class="t-ty">Before</span>(time.<span class="t-ty">Unix</span>(c.<span class="t-ty">NotBefore</span>, <span class="t-nu">0</span>)):
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, sso.<span class="t-ty">ErrTokenValidation</span>(p.errf(<span class="t-st">&quot;id token not yet valid&quot;</span>), <span class="t-kw">nil</span>)
+	<span class="t-kw">case</span> c.<span class="t-ty">Subject</span> == <span class="t-st">&quot;&quot;</span>:
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, sso.<span class="t-ty">ErrTokenValidation</span>(p.errf(<span class="t-st">&quot;id token has no subject&quot;</span>), <span class="t-kw">nil</span>)
+	}
+	<span class="t-kw">if</span> p.cfg.<span class="t-ty">CheckClaims</span> != <span class="t-kw">nil</span> {
+		<span class="t-kw">if</span> err := p.cfg.<span class="t-ty">CheckClaims</span>(j.raw); err != <span class="t-kw">nil</span> {
+			<span class="t-kw">return</span> <span class="t-kw">nil</span>, err
+		}
+	}
+	<span class="t-kw">return</span> j, <span class="t-kw">nil</span>
+}</code></pre></div></details><details><summary>Shared base: algorithm allow-list <span class="path">pkg/sso/oidc/jwt.go:75</span></summary><div class="body"><p class="mut">Rejects none, HS256 and every non-RS256 token before any key lookup.</p><button class="copy" type="button">copy</button><pre><code class="lang-go"><span class="t-kw">func</span> parseJWT(token <span class="t-ty">string</span>) (*parsedJWT, <span class="t-ty">error</span>) {
+	parts := strings.<span class="t-ty">Split</span>(token, <span class="t-st">&quot;.&quot;</span>)
+	<span class="t-kw">if</span> len(parts) != <span class="t-nu">3</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errMalformedJWT
+	}
+	dec := base64.<span class="t-ty">RawURLEncoding</span>
+	hb, err := dec.<span class="t-ty">DecodeString</span>(parts[<span class="t-nu">0</span>])
+	<span class="t-kw">if</span> err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errMalformedJWT
+	}
+	pb, err := dec.<span class="t-ty">DecodeString</span>(parts[<span class="t-nu">1</span>])
+	<span class="t-kw">if</span> err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errMalformedJWT
+	}
+	sig, err := dec.<span class="t-ty">DecodeString</span>(parts[<span class="t-nu">2</span>])
+	<span class="t-kw">if</span> err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errMalformedJWT
+	}
+	j := &amp;parsedJWT{signing: parts[<span class="t-nu">0</span>] + <span class="t-st">&quot;.&quot;</span> + parts[<span class="t-nu">1</span>], sig: sig}
+	<span class="t-kw">if</span> err := json.<span class="t-ty">Unmarshal</span>(hb, &amp;j.header); err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errMalformedJWT
+	}
+	<span class="t-kw">if</span> err := json.<span class="t-ty">Unmarshal</span>(pb, &amp;j.claims); err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errMalformedJWT
+	}
+	<span class="t-kw">if</span> err := json.<span class="t-ty">Unmarshal</span>(pb, &amp;j.raw); err != <span class="t-kw">nil</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errMalformedJWT
+	}
+	<span class="t-kw">if</span> j.header.<span class="t-ty">Alg</span> != <span class="t-st">&quot;RS256&quot;</span> {
+		<span class="t-kw">return</span> <span class="t-kw">nil</span>, errors.<span class="t-ty">New</span>(<span class="t-st">&quot;unsupported jwt algorithm: &quot;</span> + j.header.<span class="t-ty">Alg</span>)
+	}
+	<span class="t-kw">return</span> j, <span class="t-kw">nil</span>
+}
+
+<span class="t-cm">// verify checks the RS256 signature with the given public key.</span>
+<span class="t-kw">func</span> (j *parsedJWT) verify(pub *rsa.<span class="t-ty">PublicKey</span>) <span class="t-ty">error</span> {</code></pre></div></details><details><summary>Gateway: placeholder-aware vendor wiring <span class="path">cmd/ssod/vendors.go:20</span></summary><div class="body"><p class="mut">A fresh .env.example keeps all three vendors off. A client id without a secret is an error.</p><button class="copy" type="button">copy</button><pre><code class="lang-go"><span class="t-kw">func</span> vendorEnv(getenv <span class="t-kw">func</span>(<span class="t-ty">string</span>) <span class="t-ty">string</span>, name, prefix <span class="t-ty">string</span>) (id, secret, redirect <span class="t-ty">string</span>, ok <span class="t-ty">bool</span>, err <span class="t-ty">error</span>) {
+	id, secret = getenv(prefix+<span class="t-st">&quot;_CLIENT_ID&quot;</span>), getenv(prefix+<span class="t-st">&quot;_CLIENT_SECRET&quot;</span>) <span class="t-cm">// nosecret: env var names</span>
+	<span class="t-kw">if</span> isPlaceholder(id) || id == legacyOktaSampleID {
+		<span class="t-kw">return</span> <span class="t-st">&quot;&quot;</span>, <span class="t-st">&quot;&quot;</span>, <span class="t-st">&quot;&quot;</span>, <span class="t-kw">false</span>, <span class="t-kw">nil</span>
+	}
+	<span class="t-kw">if</span> isPlaceholder(secret) {
+		<span class="t-kw">return</span> <span class="t-st">&quot;&quot;</span>, <span class="t-st">&quot;&quot;</span>, <span class="t-st">&quot;&quot;</span>, <span class="t-kw">false</span>, fmt.<span class="t-ty">Errorf</span>(<span class="t-st">&quot;%s_CLIENT_SECRET is not set (client id is configured)&quot;</span>, prefix) <span class="t-cm">// nosecret</span>
+	}
+	redirect = getenv(prefix + <span class="t-st">&quot;_REDIRECT_URL&quot;</span>)
+	<span class="t-kw">if</span> redirect == <span class="t-st">&quot;&quot;</span> {
+		base := strings.<span class="t-ty">TrimRight</span>(getenv(<span class="t-st">&quot;SSO_SERVER_BASE_URL&quot;</span>), <span class="t-st">&quot;/&quot;</span>)
+		<span class="t-kw">if</span> base == <span class="t-st">&quot;&quot;</span> {
+			<span class="t-kw">return</span> <span class="t-st">&quot;&quot;</span>, <span class="t-st">&quot;&quot;</span>, <span class="t-st">&quot;&quot;</span>, <span class="t-kw">false</span>, fmt.<span class="t-ty">Errorf</span>(<span class="t-st">&quot;set %s_REDIRECT_URL or SSO_SERVER_BASE_URL&quot;</span>, prefix)
+		}
+		redirect = base + <span class="t-st">&quot;/auth/&quot;</span> + name + <span class="t-st">&quot;/callback&quot;</span>
+	}
+	<span class="t-kw">return</span> id, secret, redirect, <span class="t-kw">true</span>, <span class="t-kw">nil</span>
+}
+
+<span class="t-cm">// oktaFromEnv builds the Okta provider (id &quot;okta&quot;) or returns (nil, nil).</span>
+<span class="t-kw">func</span> oktaFromEnv(getenv <span class="t-kw">func</span>(<span class="t-ty">string</span>) <span class="t-ty">string</span>) (sso.<span class="t-ty">Provider</span>, <span class="t-ty">error</span>) {
+	<span class="t-kw">const</span> prefix = <span class="t-st">&quot;SSO_PROVIDERS_OKTA&quot;</span></code></pre></div></details></section>
+
+<section id="schema"><h2>4. Configuration schema</h2>
+<p class="mut">There is no database. State is a signed, stateless value (HMAC) plus an in-memory cache, so the schema that matters is configuration: environment variables read by <code>ssod</code> and the Go <code>Config</code> structs of each adapter.</p>
+<h3>Environment variables (<code>.env.example</code>)</h3>
+<div class="tools"><input type="search" placeholder="filter variables" aria-label="Filter variables" data-filter="t-env"><select aria-label="Filter by group" data-table="t-env" data-col="1"><option value="">all groups</option><option>Auth0</option><option>Entra ID (azure)</option><option>Google</option><option>Okta</option><option>Server</option></select></div>
+<table class="sortable" id="t-env"><thead><tr><th scope="col" data-type="str">Variable</th><th scope="col" data-type="str">Group</th><th scope="col" data-type="str">Required</th><th scope="col" data-type="str">Example in .env.example</th><th scope="col" data-type="str">Notes</th></tr></thead><tbody><tr><td data-v="SSO_SERVER_HOST"><code>SSO_SERVER_HOST</code></td><td data-v="Server">Server</td><td data-v="required">required</td><td data-v="127.0.0.1"><code>127.0.0.1</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_SERVER_PORT"><code>SSO_SERVER_PORT</code></td><td data-v="Server">Server</td><td data-v="required">required</td><td data-v="8080"><code>8080</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_SERVER_BASE_URL"><code>SSO_SERVER_BASE_URL</code></td><td data-v="Server">Server</td><td data-v="required">required</td><td data-v="http://localhost:8080"><code>http://localhost:8080</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_LOG_LEVEL"><code>SSO_LOG_LEVEL</code></td><td data-v="Server">Server</td><td data-v="required">required</td><td data-v="info"><code>info</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_STATE_SECRET"><code>SSO_STATE_SECRET</code></td><td data-v="Server">Server</td><td data-v="required">required</td><td data-v="&lt;redacted sample&gt;"><code>&lt;redacted sample&gt;</code></td><td data-v="secret"><span class="pill p-warn">secret</span> <span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_OKTA_CLIENT_ID"><code>SSO_PROVIDERS_OKTA_CLIENT_ID</code></td><td data-v="Okta">Okta</td><td data-v="required">required</td><td data-v="okta-client-id-placeholder"><code>okta-client-id-placeholder</code></td><td data-v="sample"><span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_OKTA_CLIENT_SECRET"><code>SSO_PROVIDERS_OKTA_CLIENT_SECRET</code></td><td data-v="Okta">Okta</td><td data-v="required">required</td><td data-v="&lt;redacted sample&gt;"><code>&lt;redacted sample&gt;</code></td><td data-v="secret"><span class="pill p-warn">secret</span> <span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_OKTA_ISSUER_URL"><code>SSO_PROVIDERS_OKTA_ISSUER_URL</code></td><td data-v="Okta">Okta</td><td data-v="required">required</td><td data-v="https://dev-example.okta.com/oauth2/default"><code>https://dev-example.okta.com/oauth2/default</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_OKTA_REDIRECT_URL"><code>SSO_PROVIDERS_OKTA_REDIRECT_URL</code></td><td data-v="Okta">Okta</td><td data-v="optional">optional</td><td data-v="http://localhost:8080/auth/okta/callback"><code>http://localhost:8080/auth/okta/callback</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AUTH0_CLIENT_ID"><code>SSO_PROVIDERS_AUTH0_CLIENT_ID</code></td><td data-v="Auth0">Auth0</td><td data-v="required">required</td><td data-v="auth0-client-id-placeholder"><code>auth0-client-id-placeholder</code></td><td data-v="sample"><span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_AUTH0_CLIENT_SECRET"><code>SSO_PROVIDERS_AUTH0_CLIENT_SECRET</code></td><td data-v="Auth0">Auth0</td><td data-v="required">required</td><td data-v="&lt;redacted sample&gt;"><code>&lt;redacted sample&gt;</code></td><td data-v="secret"><span class="pill p-warn">secret</span> <span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_AUTH0_ISSUER_URL"><code>SSO_PROVIDERS_AUTH0_ISSUER_URL</code></td><td data-v="Auth0">Auth0</td><td data-v="required">required</td><td data-v="https://example.us.auth0.com/"><code>https://example.us.auth0.com/</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AUTH0_REDIRECT_URL"><code>SSO_PROVIDERS_AUTH0_REDIRECT_URL</code></td><td data-v="Auth0">Auth0</td><td data-v="optional">optional</td><td data-v="http://localhost:8080/auth/auth0/callback"><code>http://localhost:8080/auth/auth0/callback</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AUTH0_AUDIENCE"><code>SSO_PROVIDERS_AUTH0_AUDIENCE</code></td><td data-v="Auth0">Auth0</td><td data-v="optional">optional</td><td data-v=""><code></code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AUTH0_ROLES_CLAIM"><code>SSO_PROVIDERS_AUTH0_ROLES_CLAIM</code></td><td data-v="Auth0">Auth0</td><td data-v="optional">optional</td><td data-v="roles"><code>roles</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AZURE_CLIENT_ID"><code>SSO_PROVIDERS_AZURE_CLIENT_ID</code></td><td data-v="Entra ID (azure)">Entra ID (azure)</td><td data-v="required">required</td><td data-v="azure-client-id-placeholder"><code>azure-client-id-placeholder</code></td><td data-v="sample"><span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_AZURE_CLIENT_SECRET"><code>SSO_PROVIDERS_AZURE_CLIENT_SECRET</code></td><td data-v="Entra ID (azure)">Entra ID (azure)</td><td data-v="required">required</td><td data-v="&lt;redacted sample&gt;"><code>&lt;redacted sample&gt;</code></td><td data-v="secret"><span class="pill p-warn">secret</span> <span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_AZURE_TENANT_ID"><code>SSO_PROVIDERS_AZURE_TENANT_ID</code></td><td data-v="Entra ID (azure)">Entra ID (azure)</td><td data-v="required">required</td><td data-v="common"><code>common</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AZURE_REDIRECT_URL"><code>SSO_PROVIDERS_AZURE_REDIRECT_URL</code></td><td data-v="Entra ID (azure)">Entra ID (azure)</td><td data-v="optional">optional</td><td data-v="http://localhost:8080/auth/azure/callback"><code>http://localhost:8080/auth/azure/callback</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AZURE_ALLOWED_TENANTS"><code>SSO_PROVIDERS_AZURE_ALLOWED_TENANTS</code></td><td data-v="Entra ID (azure)">Entra ID (azure)</td><td data-v="optional">optional</td><td data-v=""><code></code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_AZURE_AUTHORITY"><code>SSO_PROVIDERS_AZURE_AUTHORITY</code></td><td data-v="Entra ID (azure)">Entra ID (azure)</td><td data-v="optional">optional</td><td data-v=""><code></code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_GOOGLE_CLIENT_ID"><code>SSO_PROVIDERS_GOOGLE_CLIENT_ID</code></td><td data-v="Google">Google</td><td data-v="required">required</td><td data-v="google-client-id-placeholder"><code>google-client-id-placeholder</code></td><td data-v="sample"><span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_GOOGLE_CLIENT_SECRET"><code>SSO_PROVIDERS_GOOGLE_CLIENT_SECRET</code></td><td data-v="Google">Google</td><td data-v="required">required</td><td data-v="&lt;redacted sample&gt;"><code>&lt;redacted sample&gt;</code></td><td data-v="secret"><span class="pill p-warn">secret</span> <span class="pill p-mut">sample value, provider stays off</span></td></tr><tr><td data-v="SSO_PROVIDERS_GOOGLE_REDIRECT_URL"><code>SSO_PROVIDERS_GOOGLE_REDIRECT_URL</code></td><td data-v="Google">Google</td><td data-v="optional">optional</td><td data-v="http://localhost:8080/auth/google/callback"><code>http://localhost:8080/auth/google/callback</code></td><td data-v="">-</td></tr><tr><td data-v="SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN"><code>SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN</code></td><td data-v="Google">Google</td><td data-v="optional">optional</td><td data-v="example.com"><code>example.com</code></td><td data-v="">-</td></tr></tbody></table>
+<h3>Adapter <code>Config</code> structs</h3>
+<div class="tools"><input type="search" placeholder="filter fields" aria-label="Filter fields" data-filter="t-schema"></div>
+<table class="sortable" id="t-schema"><thead><tr><th scope="col" data-type="str">Go struct</th><th scope="col" data-type="str">Field</th><th scope="col" data-type="str">Type</th><th scope="col" data-type="str">Meaning (from source comment)</th></tr></thead><tbody><tr><td data-v="okta.Config">okta.Config</td><td data-v="ID"><code>ID</code></td><td data-v="string"><code>string</code></td><td data-v="provider ID used in URLs (default &quot;okta&quot;)">provider ID used in URLs (default &quot;okta&quot;)</td></tr><tr><td data-v="okta.Config">okta.Config</td><td data-v="ClientID"><code>ClientID</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="okta.Config">okta.Config</td><td data-v="ClientSecret"><code>ClientSecret</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="okta.Config">okta.Config</td><td data-v="RedirectURL"><code>RedirectURL</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="okta.Config">okta.Config</td><td data-v="IssuerURL"><code>IssuerURL</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="okta.Config">okta.Config</td><td data-v="Scopes"><code>Scopes</code></td><td data-v="[]string"><code>[]string</code></td><td data-v="default: openid email profile">default: openid email profile</td></tr><tr><td data-v="okta.Config">okta.Config</td><td data-v="DiscoveryURL"><code>DiscoveryURL</code></td><td data-v="string"><code>string</code></td><td data-v="optional override, used by tests">optional override, used by tests</td></tr><tr><td data-v="okta.Config">okta.Config</td><td data-v="HTTPClient"><code>HTTPClient</code></td><td data-v="*http.Client"><code>*http.Client</code></td><td data-v="">-</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="ID"><code>ID</code></td><td data-v="string"><code>string</code></td><td data-v="provider ID used in URLs (default &quot;auth0&quot;)">provider ID used in URLs (default &quot;auth0&quot;)</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="ClientID"><code>ClientID</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="ClientSecret"><code>ClientSecret</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="RedirectURL"><code>RedirectURL</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="IssuerURL"><code>IssuerURL</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="Audience"><code>Audience</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="RolesClaim"><code>RolesClaim</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="Scopes"><code>Scopes</code></td><td data-v="[]string"><code>[]string</code></td><td data-v="default: openid email profile">default: openid email profile</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="DiscoveryURL"><code>DiscoveryURL</code></td><td data-v="string"><code>string</code></td><td data-v="optional override, used by tests">optional override, used by tests</td></tr><tr><td data-v="auth0.Config">auth0.Config</td><td data-v="HTTPClient"><code>HTTPClient</code></td><td data-v="*http.Client"><code>*http.Client</code></td><td data-v="">-</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="ID"><code>ID</code></td><td data-v="string"><code>string</code></td><td data-v="provider ID used in URLs (default &quot;entra&quot;)">provider ID used in URLs (default &quot;entra&quot;)</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="ClientID"><code>ClientID</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="ClientSecret"><code>ClientSecret</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="RedirectURL"><code>RedirectURL</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="TenantID"><code>TenantID</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="AllowedTenants"><code>AllowedTenants</code></td><td data-v="[]string"><code>[]string</code></td><td data-v="">-</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="Authority"><code>Authority</code></td><td data-v="string"><code>string</code></td><td data-v="">-</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="Scopes"><code>Scopes</code></td><td data-v="[]string"><code>[]string</code></td><td data-v="default: openid email profile">default: openid email profile</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="DiscoveryURL"><code>DiscoveryURL</code></td><td data-v="string"><code>string</code></td><td data-v="optional override">optional override</td></tr><tr><td data-v="entra.Config">entra.Config</td><td data-v="HTTPClient"><code>HTTPClient</code></td><td data-v="*http.Client"><code>*http.Client</code></td><td data-v="">-</td></tr></tbody></table></section>
+
+<section id="validation"><h2>5. Validation suite</h2>
+<p class="mut">Each gate was executed when this page was built. Bars show wall-clock time.</p>
+<div class="flow"><span class="box" style="border-color:var(--ok)">go build</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--bd)">gofmt</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--bd)">go vet</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--bd)">go test -race</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--bd)">test gate</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--bd)">secrets scan</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--bd)">project audit</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--bd)">credential shape scan</span></div>
+<table class="sortable" id="t-gates"><thead><tr><th scope="col" data-type="str">Gate</th><th scope="col" data-type="str">Result</th><th scope="col" data-type="num">Seconds</th><th scope="col" data-type="str">Detail</th><th scope="col" data-type="str">Command</th></tr></thead><tbody><tr><td data-v="gofmt">gofmt</td><td data-v="None"><span class="pill p-mut">NOT RUN</span></td><td data-v="0.0">0.0</td><td data-v="not run (--skip-gates)">not run (--skip-gates)</td><td data-v="gofmt -l . | grep -v &#x27;^_sources&#x27; ; true"><code>gofmt -l . | grep -v &#x27;^_sources&#x27; ; true</code></td></tr><tr><td data-v="go vet">go vet</td><td data-v="None"><span class="pill p-mut">NOT RUN</span></td><td data-v="0.0">0.0</td><td data-v="not run (--skip-gates)">not run (--skip-gates)</td><td data-v="go vet ./... &amp;&amp; go vet -tags e2e ./cmd/..."><code>go vet ./... &amp;&amp; go vet -tags e2e ./cmd/...</code></td></tr><tr><td data-v="go test -race">go test -race</td><td data-v="None"><span class="pill p-mut">NOT RUN</span></td><td data-v="0.0">0.0</td><td data-v="not run (--skip-gates)">not run (--skip-gates)</td><td data-v="go test -race -count=1 -cover ./... 2&gt;&amp;1"><code>go test -race -count=1 -cover ./... 2&gt;&amp;1</code></td></tr><tr><td data-v="test gate">test gate</td><td data-v="None"><span class="pill p-mut">NOT RUN</span></td><td data-v="0.0">0.0</td><td data-v="not run (--skip-gates)">not run (--skip-gates)</td><td data-v="bash .bob/skills/test-gate/scripts/run_tests.sh"><code>bash .bob/skills/test-gate/scripts/run_tests.sh</code></td></tr><tr><td data-v="secrets scan">secrets scan</td><td data-v="None"><span class="pill p-mut">NOT RUN</span></td><td data-v="0.0">0.0</td><td data-v="not run (--skip-gates)">not run (--skip-gates)</td><td data-v="bash .bob/skills/secure-config/scripts/scan_secrets.sh ."><code>bash .bob/skills/secure-config/scripts/scan_secrets.sh .</code></td></tr><tr><td data-v="project audit">project audit</td><td data-v="None"><span class="pill p-mut">NOT RUN</span></td><td data-v="0.0">0.0</td><td data-v="not run (--skip-gates)">not run (--skip-gates)</td><td data-v="bash .bob/skills/project-audit/scripts/audit.sh"><code>bash .bob/skills/project-audit/scripts/audit.sh</code></td></tr><tr><td data-v="credential shape scan">credential shape scan</td><td data-v="None"><span class="pill p-mut">NOT RUN</span></td><td data-v="0.0">0.0</td><td data-v="not run (--skip-gates)">not run (--skip-gates)</td><td data-v="grep -rnE --exclude-dir=.git --exclude-dir=_sources --exclude-dir=.run --exclude-dir=audit --exclude-dir=target --exclude-dir=bin --exclude-dir=obj --exclude-dir=__pycache__ --exclude=&#x27;.env&#x27; --exclude=&#x27;.env.bak*&#x27; --exclude=&#x27;Documentation-Audit.html&#x27; &#x27;[0-9]{6,}-[A-Za-z0-9_]+\.apps\.googleusercontent\.com|GOCSPX-[A-Za-z0-9_-]{10,}&#x27; . ; true"><code>grep -rnE --exclude-dir=.git --exclude-dir=_sources --exclude-dir=.run --exclude-dir=audit --exclude-dir=target --exclude-dir=bin --exclude-dir=obj --exclude-dir=__pycache__ --exclude=&#x27;.env&#x27; --exclude=&#x27;.env.bak*&#x27; --exclude=&#x27;Documentation-Audit.html&#x27; &#x27;[0-9]{6,}-[A-Za-z0-9_]+\.apps\.googleusercontent\.com|GOCSPX-[A-Za-z0-9_-]{10,}&#x27; . ; true</code></td></tr></tbody></table>
+<h3>Time per gate</h3><div class="tl" id="chart-gates"></div>
+<h3>Statement coverage</h3><div id="chart-cov"></div>
+<p>The test gate runs <code>tests/run_tests.sh</code>, which runs the root suite, the five example suites, then <code>tests/e2e.sh</code>: the gateway built with <code>-tags e2e</code> serves <b>fake</b> OIDC servers and each client signs in through each provider.</p><div class="flow"><span class="box" style="border-color:var(--acc)">root go test -race</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--acc)">5 example suites</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--acc)">build ssod -tags e2e</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--acc)">5 clients &times; okta, auth0, azure, mock = 20 sign-ins</span><span class="arr">&rarr;</span><span class="box" style="border-color:var(--acc)">4 negative checks</span></div></section>
+
+<section id="findings"><h2>6. Outdated pages and open items</h2>
+<h3>Documentation accuracy check</h3>
+<p class="mut">Pages searched for statements that contradict the code.</p>
+<table class="sortable" id="t-stale"><thead><tr><th scope="col" data-type="str">Verdict</th><th scope="col" data-type="str">Location</th><th scope="col" data-type="str">Finding</th><th scope="col" data-type="str">Evidence</th><th scope="col" data-type="str">Action</th></tr></thead><tbody><tr><td data-v="fixed"><span class="pill p-ok">FIXED</span></td><td data-v="Docs/Google-SSO-Setup.md"><code>Docs/Google-SSO-Setup.md:110</code></td><td data-v="Troubleshooting S4 no longer claims the Google provider is unregistered.">Troubleshooting S4 no longer claims the Google provider is unregistered.</td><td data-v="cmd/ssod/main.go googleFromEnv registers it; TestGoogleFromEnv covers it">cmd/ssod/main.go googleFromEnv registers it; TestGoogleFromEnv covers it</td><td data-v="None">None</td></tr><tr><td data-v="fixed"><span class="pill p-ok">FIXED</span></td><td data-v="Docs/Google-SSO-Setup.md"><code>Docs/Google-SSO-Setup.md:323</code></td><td data-v="Hosted-domain restriction is documented as implemented.">Hosted-domain restriction is documented as implemented.</td><td data-v="pkg/sso/google/provider.go checkDomain enforces the hd claim; provider_test.go tests it">pkg/sso/google/provider.go checkDomain enforces the hd claim; provider_test.go tests it</td><td data-v="None">None</td></tr><tr><td data-v="accurate"><span class="pill p-ok">ACCURATE</span></td><td data-v="Docs/SAML-SSO-Setup.md"><code>Docs/SAML-SSO-Setup.md:5</code></td><td data-v="SAML 2.0 guide still says &#x27;planned&#x27;. Correct: no adapter exists.">SAML 2.0 guide still says &#x27;planned&#x27;. Correct: no adapter exists.</td><td data-v="ssod registers mock, google, okta, auth0, azure only">ssod registers mock, google, okta, auth0, azure only</td><td data-v="Update when the adapter lands">Update when the adapter lands</td></tr><tr><td data-v="accurate"><span class="pill p-ok">ACCURATE</span></td><td data-v="Docs/OAuth2-SSO-Setup.md"><code>Docs/OAuth2-SSO-Setup.md:5</code></td><td data-v="Generic OAuth 2.0 guide still says &#x27;planned&#x27;. Correct: no adapter exists.">Generic OAuth 2.0 guide still says &#x27;planned&#x27;. Correct: no adapter exists.</td><td data-v="ssod registers mock, google, okta, auth0, azure only">ssod registers mock, google, okta, auth0, azure only</td><td data-v="Update when the adapter lands">Update when the adapter lands</td></tr></tbody></table>
+<h3>Open items</h3>
+<div class="tools"><select aria-label="Filter by status" data-table="t-items" data-col="4"><option value="">all</option><option>open</option><option>done</option></select></div>
+<table class="sortable" id="t-items"><thead><tr><th scope="col" data-type="num">Priority</th><th scope="col" data-type="str">Item</th><th scope="col" data-type="str">Why</th><th scope="col" data-type="str">Owner</th><th scope="col" data-type="str">Status</th></tr></thead><tbody><tr><td data-v="0"><span class="pill p-bad">high</span></td><td data-v="Sign in against a live Okta, Auth0 and Entra tenant">Sign in against a live Okta, Auth0 and Entra tenant</td><td data-v="Adapters are verified against an in-process fake IdP only. Needs your tenant, credentials and a browser.">Adapters are verified against an in-process fake IdP only. Needs your tenant, credentials and a browser.</td><td data-v="you">you</td><td data-v="open"><span class="pill p-warn">open</span></td></tr><tr><td data-v="1"><span class="pill p-warn">medium</span></td><td data-v="Build output is in git history (1533 objects)">Build output is in git history (1533 objects)</td><td data-v="target/, bin/, obj/ were pushed earlier. The working tree no longer tracks them. Removal needs a history rewrite and force-push.">target/, bin/, obj/ were pushed earlier. The working tree no longer tracks them. Removal needs a history rewrite and force-push.</td><td data-v="you decide">you decide</td><td data-v="open"><span class="pill p-warn">open</span></td></tr><tr><td data-v="1"><span class="pill p-warn">medium</span></td><td data-v="SAML 2.0 and generic OAuth 2.0 adapters">SAML 2.0 and generic OAuth 2.0 adapters</td><td data-v="Not implemented. The Go and Rust example clients default to these ids and report PROVIDER_NOT_FOUND.">Not implemented. The Go and Rust example clients default to these ids and report PROVIDER_NOT_FOUND.</td><td data-v="backlog">backlog</td><td data-v="open"><span class="pill p-warn">open</span></td></tr><tr><td data-v="2"><span class="pill p-mut">low</span></td><td data-v="Node.js example client">Node.js example client</td><td data-v="Only Rust, Go, Python, Java and C# exist.">Only Rust, Go, Python, Java and C# exist.</td><td data-v="you decide">you decide</td><td data-v="open"><span class="pill p-warn">open</span></td></tr><tr><td data-v="2"><span class="pill p-mut">low</span></td><td data-v="Delete branch backup-before-squash">Delete branch backup-before-squash</td><td data-v="Leftover safety branch.">Leftover safety branch.</td><td data-v="you">you</td><td data-v="open"><span class="pill p-warn">open</span></td></tr><tr><td data-v="2"><span class="pill p-mut">low</span></td><td data-v="Working tree">Working tree</td><td data-v="3 uncommitted path(s): Docs/Google-SSO-Setup.md, Docs/Documentation-Audit.html, scripts/build_audit_dashboard.py">3 uncommitted path(s): Docs/Google-SSO-Setup.md, Docs/Documentation-Audit.html, scripts/build_audit_dashboard.py</td><td data-v="you">you</td><td data-v="open"><span class="pill p-warn">open</span></td></tr></tbody></table></section>
+</main>
+<footer>Made with IBM Bob</footer>
+<script id="data" type="application/json">{"docs": [{"file": ".env.example", "added": 9, "removed": 1, "kind": "config", "what": "Okta sample id is now a placeholder, new optional variables documented"}, {"file": "Docs/Architecture.md", "added": 30, "removed": 1, "kind": "guide", "what": "New 'OIDC vendor adapters' and 'Verification boundary' sections, diagram"}, {"file": "Docs/Auth0-SSO-Setup.md", "added": 12, "removed": 9, "kind": "guide", "what": "Status note, 404 row, trailing-slash issuer, AUDIENCE and ROLES_CLAIM variables"}, {"file": "Docs/Azure-AD-SSO-Setup.md", "added": 14, "removed": 10, "kind": "guide", "what": "Status note, tenant pinning, ALLOWED_TENANTS and AUTHORITY variables"}, {"file": "Docs/Examples.md", "added": 91, "removed": 0, "kind": "guide", "what": "Rewrote 'Read this first', added 'End-to-end check'"}, {"file": "Docs/Google-SSO-Setup.md", "added": 2, "removed": 2, "kind": "guide", "what": "S4 no longer says Google is unregistered, hosted-domain restriction documented as implemented"}, {"file": "Docs/Okta-SSO-Setup.md", "added": 10, "removed": 10, "kind": "guide", "what": "Status note, 404 row, security-control rows, planned-adapter wording"}, {"file": "Docs/Quickstart.md", "added": 7, "removed": 6, "kind": "guide", "what": "Provider status table, scope paragraph, troubleshooting, next steps"}, {"file": "Makefile", "added": 4, "removed": 1, "kind": "config", "what": "Added test-e2e target"}, {"file": "README.md", "added": 11, "removed": 6, "kind": "readme", "what": "Status line, workflow diagram node, provider table, scope paragraph"}, {"file": "examples/auth0-python/README.md", "added": 1, "removed": 1, "kind": "example README", "what": "'Read this first' banner replaced (adapter no longer planned)"}, {"file": "examples/azure-ad-csharp/README.md", "added": 1, "removed": 1, "kind": "example README", "what": "'Read this first' banner replaced (adapter no longer planned)"}, {"file": "examples/oauth2-rust/README.md", "added": 1, "removed": 1, "kind": "example README", "what": "'Read this first' banner replaced (adapter no longer planned)"}, {"file": "examples/okta-java/README.md", "added": 1, "removed": 1, "kind": "example README", "what": "'Read this first' banner replaced (adapter no longer planned)"}, {"file": "examples/saml2-go/README.md", "added": 1, "removed": 1, "kind": "example README", "what": "'Read this first' banner replaced (adapter no longer planned)"}], "coverage": [], "gates": [{"name": "gofmt", "ok": null, "seconds": 0.0, "detail": "not run (--skip-gates)", "cmd": "gofmt -l . | grep -v '^_sources' ; true"}, {"name": "go vet", "ok": null, "seconds": 0.0, "detail": "not run (--skip-gates)", "cmd": "go vet ./... && go vet -tags e2e ./cmd/..."}, {"name": "go test -race", "ok": null, "seconds": 0.0, "detail": "not run (--skip-gates)", "cmd": "go test -race -count=1 -cover ./... 2>&1"}, {"name": "test gate", "ok": null, "seconds": 0.0, "detail": "not run (--skip-gates)", "cmd": "bash .bob/skills/test-gate/scripts/run_tests.sh"}, {"name": "secrets scan", "ok": null, "seconds": 0.0, "detail": "not run (--skip-gates)", "cmd": "bash .bob/skills/secure-config/scripts/scan_secrets.sh ."}, {"name": "project audit", "ok": null, "seconds": 0.0, "detail": "not run (--skip-gates)", "cmd": "bash .bob/skills/project-audit/scripts/audit.sh"}, {"name": "credential shape scan", "ok": null, "seconds": 0.0, "detail": "not run (--skip-gates)", "cmd": "grep -rnE --exclude-dir=.git --exclude-dir=_sources --exclude-dir=.run --exclude-dir=audit --exclude-dir=target --exclude-dir=bin --exclude-dir=obj --exclude-dir=__pycache__ --exclude='.env' --exclude='.env.bak*' --exclude='Documentation-Audit.html' '[0-9]{6,}-[A-Za-z0-9_]+\\.apps\\.googleusercontent\\.com|GOCSPX-[A-Za-z0-9_-]{10,}' . ; true"}]}</script>
+<script>
+(function(){
+ // ---- sortable tables
+ document.querySelectorAll('table.sortable').forEach(function(t){
+  var heads=t.tHead.rows[0].cells;
+  Array.prototype.forEach.call(heads,function(th,idx){
+   th.tabIndex=0;th.setAttribute('role','columnheader');
+   function go(){
+    var dir=th.getAttribute('aria-sort')==='ascending'?'descending':'ascending';
+    Array.prototype.forEach.call(heads,function(h){h.removeAttribute('aria-sort')});
+    th.setAttribute('aria-sort',dir);
+    var body=t.tBodies[0],rows=Array.prototype.slice.call(body.rows);
+    var num=th.getAttribute('data-type')==='num';
+    rows.sort(function(a,b){
+     var x=a.cells[idx].getAttribute('data-v')||a.cells[idx].textContent.trim();
+     var y=b.cells[idx].getAttribute('data-v')||b.cells[idx].textContent.trim();
+     if(num){x=parseFloat(x)||0;y=parseFloat(y)||0;return dir==='ascending'?x-y:y-x}
+     return dir==='ascending'?x.localeCompare(y):y.localeCompare(x);
+    });
+    rows.forEach(function(r){body.appendChild(r)});
+   }
+   th.addEventListener('click',go);
+   th.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}});
+  });
+ });
+ // ---- table filters
+ document.querySelectorAll('input[data-filter]').forEach(function(inp){
+  var t=document.getElementById(inp.getAttribute('data-filter'));
+  inp.addEventListener('input',function(){
+   var q=inp.value.toLowerCase();
+   Array.prototype.forEach.call(t.tBodies[0].rows,function(r){r.style.display=r.textContent.toLowerCase().indexOf(q)>-1?'':'none'});
+  });
+ });
+ document.querySelectorAll('select[data-col]').forEach(function(sel){
+  var t=document.getElementById(sel.getAttribute('data-table')),c=+sel.getAttribute('data-col');
+  sel.addEventListener('change',function(){
+   Array.prototype.forEach.call(t.tBodies[0].rows,function(r){r.style.display=(!sel.value||r.cells[c].textContent.trim()===sel.value)?'':'none'});
+  });
+ });
+ // ---- copy buttons
+ document.querySelectorAll('button.copy').forEach(function(b){
+  b.addEventListener('click',function(){
+   var code=b.parentNode.querySelector('pre code').textContent;
+   if(navigator.clipboard){navigator.clipboard.writeText(code).then(function(){b.textContent='copied';setTimeout(function(){b.textContent='copy'},1200)})}
+  });
+ });
+ // ---- charts (inline SVG, no libraries)
+ var D=JSON.parse(document.getElementById('data').textContent);
+ var NS='http://www.w3.org/2000/svg';
+ function el(n,a,txt){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e}
+ function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+ function drawDocs(){
+  var host=document.getElementById('chart-docs');host.textContent='';
+  var rows=D.docs.slice().sort(function(a,b){return (b.added+b.removed)-(a.added+a.removed)});
+  var W=900,rh=24,pad=210,H=rows.length*rh+30,max=Math.max.apply(null,rows.map(function(r){return r.added+r.removed}))||1;
+  var s=el('svg',{viewBox:'0 0 '+W+' '+H,class:'chart',role:'img','aria-label':'Lines added and removed per documentation file'});
+  rows.forEach(function(r,i){
+   var y=i*rh+6,sc=(W-pad-60)/max;
+   s.appendChild(el('text',{x:pad-8,y:y+14,'text-anchor':'end','font-size':12,fill:css('--tx')},r.file.length>34?'...'+r.file.slice(-31):r.file));
+   s.appendChild(el('rect',{x:pad,y:y,width:Math.max(1,r.added*sc),height:16,fill:css('--ok')},null)).appendChild(el('title',{},r.file+': +'+r.added));
+   s.appendChild(el('rect',{x:pad+r.added*sc,y:y,width:Math.max(r.removed?1:0,r.removed*sc),height:16,fill:css('--bad')},null)).appendChild(el('title',{},r.file+': -'+r.removed));
+   s.appendChild(el('text',{x:pad+(r.added+r.removed)*sc+6,y:y+13,'font-size':11,fill:css('--mut')},'+'+r.added+' / -'+r.removed));
+  });
+  host.appendChild(s);
+ }
+ function drawCov(){
+  var host=document.getElementById('chart-cov');host.textContent='';
+  var rows=D.coverage.slice().sort(function(a,b){return b.cov-a.cov});
+  var W=900,rh=24,pad=230,H=rows.length*rh+14;
+  var s=el('svg',{viewBox:'0 0 '+W+' '+H,class:'chart',role:'img','aria-label':'Statement coverage per package'});
+  rows.forEach(function(r,i){
+   var y=i*rh+4,sc=(W-pad-70)/100,col=r.cov>=85?css('--ok'):(r.cov>=50?css('--warn'):css('--bad'));
+   s.appendChild(el('text',{x:pad-8,y:y+14,'text-anchor':'end','font-size':12,fill:css('--tx')},r.pkg));
+   s.appendChild(el('rect',{x:pad,y:y,width:100*sc,height:16,fill:css('--surf'),stroke:css('--bd')}));
+   s.appendChild(el('rect',{x:pad,y:y,width:r.cov*sc,height:16,fill:col}));
+   s.appendChild(el('text',{x:pad+100*sc+8,y:y+13,'font-size':12,fill:css('--tx')},r.cov.toFixed(1)+'%'));
+  });
+  host.appendChild(s);
+ }
+ function drawGates(){
+  var host=document.getElementById('chart-gates');host.textContent='';
+  var max=Math.max.apply(null,D.gates.map(function(g){return g.seconds}))||1;
+  D.gates.forEach(function(g){
+   var row=document.createElement('div');row.className='row';
+   var n=document.createElement('div');n.textContent=g.name;
+   var wrap=document.createElement('div');var b=document.createElement('div');b.className='bar';
+   b.style.width=Math.max(1,g.seconds/max*100)+'%';
+   b.style.background=g.ok===true?css('--ok'):(g.ok===false?css('--bad'):css('--bd'));
+   b.title=g.name+': '+g.seconds+'s';wrap.appendChild(b);
+   var t=document.createElement('div');t.className='mut';t.textContent=g.seconds+' s';
+   row.appendChild(n);row.appendChild(wrap);row.appendChild(t);host.appendChild(row);
+  });
+ }
+ function drawAll(){drawDocs();drawCov();drawGates()}
+ drawAll();
+ if(window.matchMedia){window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawAll)}
+})();
+</script>
+</body></html>
