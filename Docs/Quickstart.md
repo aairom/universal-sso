@@ -1,23 +1,176 @@
 # Quickstart
 
-This is a Go library plus a small reference server, `cmd/ssod`, that exposes the Manager over HTTP with the mock provider.
+Universal SSO is a Go library plus a small reference server, `cmd/ssod`, that exposes the `Manager` over HTTP. It ships with a `mock` provider (no setup) and a `google` provider (needs credentials).
 
-1. Copy `.env.example` to `.env`; set `SSO_STATE_SECRET` to at least 32 random bytes.
-2. Run the tests: `make test`
-3. Start and stop the server: `make start` (prints the URL), `make stop`, `make restart`. Try `curl <URL>/healthz` and open `<URL>/auth/mock/login`.
-4. Use the library directly:
+## Contents
 
-```go
-signer, _ := sso.NewStateSigner([]byte(os.Getenv("SSO_STATE_SECRET")), 10*time.Minute)
-mgr := sso.NewManager(sso.NewMemoryCache(time.Minute), signer, 10*time.Minute)
-_ = mgr.Register(mock.New("mock"))
+1. [Prerequisites](#prerequisites)
+2. [Configure](#configure)
+3. [Run and verify](#run-and-verify)
+4. [Provider status](#provider-status)
+5. [Sign in with Google](#sign-in-with-google)
+6. [Use as a library](#use-as-a-library)
+7. [Before you push](#before-you-push)
+8. [Troubleshooting](#troubleshooting)
+9. [What next](#what-next)
 
-resp, _ := mgr.BeginLogin(ctx, "mock", sso.AuthURLRequest{}) // redirect user to resp.URL
-// in the callback handler:
-result, err := mgr.CompleteLogin(ctx, "mock", sso.CallbackRequest{State: state, Code: code})
+## Prerequisites
+
+| Tool | Why |
+|---|---|
+| Go 1.25.3 or newer | build and test (`go.mod` pins it) |
+| `make` | wraps build, test, start and stop |
+| `curl` | verify endpoints |
+| `openssl` | generate the state secret |
+
+On macOS, port 5000 is reserved by AirDrop. `scripts/start.sh` refuses it, so keep the default `8080` or pick another.
+
+## Configure
+
+```bash
+cp -n .env.example .env && chmod 600 .env
+sed -i.bak "s|^SSO_STATE_SECRET=.*|SSO_STATE_SECRET=$(openssl rand -base64 48 | tr -d '\n')|" .env && rm .env.bak
 ```
 
-5. Google sign-in: fill the `SSO_PROVIDERS_GOOGLE_*` values in `.env`, then run `make google-check`, `make google-url` and `make google-exchange CODE='<full redirected URL>'`. Then `make restart` and open `<URL>/auth/google/login`. See [Google-SSO-Setup.md](Google-SSO-Setup.md).
-6. Other providers: setup guides exist for [Azure AD / Entra ID](Azure-AD-SSO-Setup.md), [Okta](Okta-SSO-Setup.md), [Auth0](Auth0-SSO-Setup.md), [SAML 2.0](SAML-SSO-Setup.md) and [generic OAuth 2.0](OAuth2-SSO-Setup.md). Their adapters are planned, so `ssod` returns `404 PROVIDER_NOT_FOUND` for them today. Each guide shows how to configure and verify the provider side manually.
+- `SSO_STATE_SECRET` signs the login state (HMAC). It must be at least 32 bytes and private.
+- The example value in `.env.example` is public. `ssod` **refuses to start** with it and tells you to generate your own.
+- `.env` is git-ignored and is read by the shell in `scripts/start.sh`, so quote values that contain spaces or `$`.
+- Leave the `SSO_PROVIDERS_*` entries untouched to run with the mock provider only. Values ending in `-placeholder` are treated as unset.
 
-Providers can also be created by name via `sso.NewProvider("mock", cfg)` after importing the driver package.
+## Run and verify
+
+```bash
+make test        # go vet + go test -race -cover
+make start       # builds cmd/ssod and runs it detached
+```
+
+Expected output of `make start`:
+
+```text
+Application started (pid 12345)
+URL: http://127.0.0.1:8080
+Logs: .run/app.log
+```
+
+The pid differs on each run. Then:
+
+```bash
+curl -s http://127.0.0.1:8080/healthz      # {"status":"ok"}
+curl -s http://127.0.0.1:8080/providers    # lists registered providers
+make stop                                  # graceful shutdown; make restart does stop + start
+```
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /` | landing page |
+| `GET /healthz` | liveness check |
+| `GET /providers` | registered provider ids |
+| `GET /auth/{provider}/login` | start a sign-in, redirects to the provider |
+| `GET /auth/{provider}/callback` | provider redirects back here |
+| `GET /mock/authorize` | built-in fake login page for the mock provider |
+
+Try the full flow without any account: open `http://127.0.0.1:8080/auth/mock/login` in a browser.
+
+## Provider status
+
+| Provider | Status | Guide |
+|---|---|---|
+| mock | Implemented | none needed |
+| Google | Implemented | [Google-SSO-Setup.md](Google-SSO-Setup.md) |
+| Azure AD / Entra ID | Planned | [Azure-AD-SSO-Setup.md](Azure-AD-SSO-Setup.md) |
+| Okta | Planned | [Okta-SSO-Setup.md](Okta-SSO-Setup.md) |
+| Auth0 | Planned | [Auth0-SSO-Setup.md](Auth0-SSO-Setup.md) |
+| SAML 2.0 | Planned | [SAML-SSO-Setup.md](SAML-SSO-Setup.md) |
+| Generic OAuth 2.0 | Planned | [OAuth2-SSO-Setup.md](OAuth2-SSO-Setup.md) |
+
+For a planned provider, `ssod` answers `404 PROVIDER_NOT_FOUND`. Its guide still shows how to configure and verify the identity-provider side by hand.
+
+## Sign in with Google
+
+1. Fill the `SSO_PROVIDERS_GOOGLE_*` values in `.env` (see the Google guide for where to find them).
+2. Validate and test the setup:
+
+   ```bash
+   make google-check                                   # validates .env
+   make google-url                                     # prints a sign-in URL
+   make google-exchange CODE='<full redirected URL>'   # checks the token claims
+   ```
+
+3. `make restart`. The log line `providers: google, mock` in `.run/app.log` confirms Google is registered.
+4. Open `http://127.0.0.1:8080/auth/google/login`.
+
+## Use as a library
+
+The snippet builds the provider directly with `mock.New`. To create providers by name with `sso.NewProvider("mock", cfg)`, import the driver package for its side effect: `import _ "github.com/universal-sso/universal-sso/pkg/sso/mock"`.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/universal-sso/universal-sso/pkg/sso"
+	"github.com/universal-sso/universal-sso/pkg/sso/mock"
+)
+
+func main() {
+	ctx := context.Background()
+	ttl := 10 * time.Minute
+
+	signer, err := sso.NewStateSigner([]byte(os.Getenv("SSO_STATE_SECRET")), ttl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mgr := sso.NewManager(sso.NewMemoryCache(time.Minute), signer, ttl)
+	if err := mgr.Register(mock.New("mock")); err != nil {
+		log.Fatal(err)
+	}
+
+	// 1. Redirect the user to resp.URL.
+	resp, err := mgr.BeginLogin(ctx, "mock", sso.AuthURLRequest{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(resp.URL)
+
+	// 2. In your callback handler, pass back the state and code from the query string.
+	var state, code string // read from the request
+	result, err := mgr.CompleteLogin(ctx, "mock", sso.CallbackRequest{State: state, Code: code})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(result.User.Email)
+}
+```
+
+The cache is in memory. Pending logins are lost on restart and are not shared between instances, so run one instance or supply your own `sso.Cache` implementation.
+
+## Before you push
+
+```bash
+bash .bob/skills/secure-config/scripts/scan_secrets.sh .
+bash .bob/skills/test-gate/scripts/run_tests.sh
+scripts/github-push.sh        # interactive helper: sets the remote, commits, pushes
+```
+
+`.env` and `_sources/` are git-ignored. Do not paste real or realistic-looking Google Client IDs or `GOCSPX-` client secrets into docs, code or tests: GitHub push protection matches their shape and blocks the push. Describe them in words, or build test values by string concatenation.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `ssod: configuration error: SSO_STATE_SECRET still holds the public example value` | Run the command in [Configure](#configure) to generate your own secret. |
+| `make start` complains about `SSO_STATE_SECRET` or port 5000 | Set a non-empty secret, and pick a port other than 5000 on macOS. |
+| `404 PROVIDER_NOT_FOUND` on `/auth/<provider>/login` | The provider is planned or not configured. Check `/providers` and the [status table](#provider-status). |
+| Google sign-in fails | Run `make google-check`, then see [Google-SSO-Setup.md](Google-SSO-Setup.md). |
+| Server not reachable | Read `.run/app.log`; `make stop` then `make start`. |
+
+## What next
+
+- [Architecture.md](Architecture.md): components, protocols, security model.
+- Provider guides in the [status table](#provider-status).
+- Adapters for Entra ID, Okta, Auth0, SAML and generic OAuth 2.0 are the next planned work.

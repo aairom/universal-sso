@@ -2,7 +2,7 @@
 
 A modular Go SDK that gives applications one `Provider` abstraction over OIDC, OAuth 2.0 and SAML 2.0 identity providers. The core ships signed state (HMAC), mandatory PKCE (S256), one-time-use login state, a pluggable cache, a driver registry and an in-memory mock provider for tests.
 
-**Status:** core, `Manager`, registry, mock provider and the **Google OIDC provider** (`pkg/sso/google`) are implemented. Okta, Auth0, Azure AD and SAML adapters are still to do; see [Docs/Architecture.md](Docs/Architecture.md).
+**Status:** core, `Manager`, registry, mock provider and the **Google OIDC provider** (`pkg/sso/google`) are implemented. Okta, Auth0, Azure AD, SAML 2.0 and generic OAuth 2.0 adapters are still to do; see [Docs/Architecture.md](Docs/Architecture.md).
 
 ## Architecture
 
@@ -44,12 +44,14 @@ sequenceDiagram
 See [Docs/Quickstart.md](Docs/Quickstart.md), [Docs/Architecture.md](Docs/Architecture.md) and, for Google sign-in, [Docs/Google-SSO-Setup.md](Docs/Google-SSO-Setup.md).
 
 ```bash
-cp .env.example .env     # set SSO_STATE_SECRET (>= 32 bytes): openssl rand -base64 48
+cp .env.example .env     # then set SSO_STATE_SECRET to: openssl rand -base64 48 (ssod refuses the example value)
 make start               # builds cmd/ssod, runs it detached, prints the URL
 make stop                # graceful SIGTERM, SIGKILL after STOP_TIMEOUT
 make restart
 make test                # go vet + go test -race -cover
 ```
+
+Before publishing, run `bash .bob/skills/secure-config/scripts/scan_secrets.sh .`, then `scripts/github-push.sh` (interactive helper that sets the remote, commits and pushes).
 
 ### Google credential helper (`ssoctl`)
 

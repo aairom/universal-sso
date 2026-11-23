@@ -6,7 +6,8 @@
 //	SSO_SERVER_HOST                      bind address (default 127.0.0.1)
 //	SSO_SERVER_PORT                      listen port (default 8080)
 //	SSO_SERVER_BASE_URL                  public base URL, used for the default Google redirect URL
-//	SSO_STATE_SECRET                     HMAC secret, at least 32 bytes (required)
+//	SSO_STATE_SECRET                     HMAC secret, at least 32 bytes (required);
+//	                                     the example value from .env.example is refused
 //	SSO_PROVIDERS_GOOGLE_CLIENT_ID       enables the Google provider when set
 //	SSO_PROVIDERS_GOOGLE_CLIENT_SECRET   Google client secret
 //	SSO_PROVIDERS_GOOGLE_REDIRECT_URL    optional, default <SSO_SERVER_BASE_URL>/auth/google/callback
@@ -36,6 +37,10 @@ import (
 const (
 	stateTTL        = 10 * time.Minute
 	shutdownTimeout = 10 * time.Second
+
+	// exampleStatePrefix starts the public sample SSO_STATE_SECRET shipped in
+	// .env.example. A secret with this prefix is a published HMAC key.
+	exampleStatePrefix = "change-this"
 )
 
 func envOr(key, def string) string {
@@ -79,7 +84,11 @@ func googleFromEnv(getenv func(string) string) (sso.Provider, error) {
 
 // build wires the Manager from the environment.
 func build(getenv func(string) string) (*sso.Manager, error) {
-	signer, err := sso.NewStateSigner([]byte(getenv("SSO_STATE_SECRET")), stateTTL)
+	stateSecret := getenv("SSO_STATE_SECRET")
+	if strings.HasPrefix(stateSecret, exampleStatePrefix) {
+		return nil, errors.New("SSO_STATE_SECRET still holds the public example value from .env.example: generate your own with `openssl rand -base64 48`")
+	}
+	signer, err := sso.NewStateSigner([]byte(stateSecret), stateTTL)
 	if err != nil {
 		return nil, err
 	}

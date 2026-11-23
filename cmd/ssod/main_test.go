@@ -33,6 +33,20 @@ func TestBuildRequiresSecret(t *testing.T) {
 	}
 }
 
+func TestBuildRejectsExampleSecret(t *testing.T) {
+	// The value shipped in .env.example is public and long enough to pass the
+	// length check, so build must refuse it explicitly.
+	_, err := build(func(k string) string {
+		if k == "SSO_STATE_SECRET" {
+			return exampleStatePrefix + "-super-secret-key-32bytes-min!"
+		}
+		return ""
+	})
+	if err == nil || !strings.Contains(err.Error(), "openssl rand") {
+		t.Fatalf("expected example-secret error with fix hint, got %v", err)
+	}
+}
+
 func TestEnvOr(t *testing.T) {
 	t.Setenv("SSOD_TEST_X", "")
 	if envOr("SSOD_TEST_X", "d") != "d" {
