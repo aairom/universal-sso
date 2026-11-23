@@ -18,7 +18,7 @@ const (
 
 func TestOktaFlow(t *testing.T) {
 	f := oidctest.New(t)
-	iss := f.URL() + "/oauth2/default" // custom authorization server issuer has a path
+	iss := f.URL() + "/oauth2/default"                                                                         // custom authorization server issuer has a path
 	p, err := New(Config{ClientID: client, ClientSecret: "test-value", RedirectURL: redirect, IssuerURL: iss}) // nosecret: fixture
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestOktaConfig(t *testing.T) {
 }
 
 func TestOktaDriverRegistered(t *testing.T) {
-	p, err := sso.NewFromDriver(DriverName, map[string]string{
+	p, err := sso.NewProvider(DriverName, map[string]string{
 		"client_id": client, "client_secret": "test-value", "redirect_url": redirect, // nosecret
 		"issuer_url": "https://org.example.test/oauth2/default", "scopes": "openid groups",
 	})

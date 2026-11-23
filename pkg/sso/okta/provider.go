@@ -17,7 +17,7 @@ const DriverName = "okta"
 
 func init() {
 	sso.RegisterDriver(DriverName, func(cfg map[string]string) (sso.Provider, error) {
-		return New(Config{
+		p, err := New(Config{
 			ID:           cfg["id"],
 			ClientID:     cfg["client_id"],
 			ClientSecret: cfg["client_secret"],
@@ -25,6 +25,10 @@ func init() {
 			IssuerURL:    cfg["issuer_url"],
 			Scopes:       strings.Fields(cfg["scopes"]),
 		})
+		if err != nil {
+			return nil, err // never wrap a nil *Provider in the interface
+		}
+		return p, nil
 	})
 }
 

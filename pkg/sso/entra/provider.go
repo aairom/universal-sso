@@ -30,7 +30,7 @@ const LoginHost = "https://login.microsoftonline.com/"
 
 func init() {
 	sso.RegisterDriver(DriverName, func(cfg map[string]string) (sso.Provider, error) {
-		return New(Config{
+		p, err := New(Config{
 			ID:             cfg["id"],
 			ClientID:       cfg["client_id"],
 			ClientSecret:   cfg["client_secret"],
@@ -40,6 +40,10 @@ func init() {
 			AllowedTenants: strings.FieldsFunc(cfg["allowed_tenants"], func(r rune) bool { return r == ',' || r == ' ' }),
 			Scopes:         strings.Fields(cfg["scopes"]),
 		})
+		if err != nil {
+			return nil, err // never wrap a nil *Provider in the interface
+		}
+		return p, nil
 	})
 }
 

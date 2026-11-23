@@ -1,5 +1,6 @@
 // Command ssod runs the Universal SSO gateway with the mock provider and,
-// when configured, the Google provider.
+// when configured, the Google, Okta, Auth0 and Microsoft Entra (id "azure")
+// providers.
 //
 // Configuration (environment, see .env.example):
 //
@@ -12,6 +13,13 @@
 //	SSO_PROVIDERS_GOOGLE_CLIENT_SECRET   Google client secret
 //	SSO_PROVIDERS_GOOGLE_REDIRECT_URL    optional, default <SSO_SERVER_BASE_URL>/auth/google/callback
 //	SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN   optional, restrict sign-in to one Workspace domain
+//	SSO_PROVIDERS_OKTA_*                 CLIENT_ID, CLIENT_SECRET, ISSUER_URL, REDIRECT_URL (optional)
+//	SSO_PROVIDERS_AUTH0_*                CLIENT_ID, CLIENT_SECRET, ISSUER_URL, REDIRECT_URL (optional),
+//	                                     AUDIENCE (optional), ROLES_CLAIM (optional)
+//	SSO_PROVIDERS_AZURE_*                CLIENT_ID, CLIENT_SECRET, TENANT_ID, REDIRECT_URL (optional),
+//	                                     ALLOWED_TENANTS (optional, multi-tenant), AUTHORITY (optional)
+//
+// A vendor whose client id is empty or an unedited sample stays disabled.
 //
 // SIGINT/SIGTERM trigger a graceful shutdown.
 package main
@@ -105,6 +113,20 @@ func build(getenv func(string) string) (*sso.Manager, error) {
 	if gp != nil {
 		if err := m.Register(gp); err != nil {
 			return nil, err
+		}
+	}
+	for _, v := range []struct {
+		name string
+		from func(func(string) string) (sso.Provider, error)
+	}{{"okta", oktaFromEnv}, {"auth0", auth0FromEnv}, {"azure", azureFromEnv}} {
+		vp, err := v.from(getenv)
+		if err != nil {
+			return nil, fmt.Errorf("%s provider: %w", v.name, err)
+		}
+		if vp != nil {
+			if err := m.Register(vp); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return m, nil
