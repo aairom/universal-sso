@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("azure-ad-csharp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+60979123eae630d43165b4fd1ed8106a8ccc47f2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2845460a371c692056b7fb469d2b6e7616db16a2")]
 [assembly: System.Reflection.AssemblyProductAttribute("azure-ad-csharp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("azure-ad-csharp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

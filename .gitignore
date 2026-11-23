@@ -23,3 +23,7 @@ AGENTS.md
 .bob/mcp.json
 .bob/audit/
 .DS_Store
+# build output of the examples
+target/
+bin/
+obj/

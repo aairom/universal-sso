@@ -1,10 +1,14 @@
-.PHONY: build test start stop restart clean google-check google-url google-exchange
+.PHONY: build test test-examples start stop restart clean google-check google-url google-exchange
 
 build:
 	go build -o .run/ssod ./cmd/ssod
 
 test:
 	go vet ./... && go test -race -cover ./...
+
+# Root tests plus every example's own suite (see Docs/Examples.md).
+test-examples:
+	bash tests/run_tests.sh
 
 start:
 	scripts/start.sh
