@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/universal-sso/universal-sso/pkg/sso/oauth2/oauth2test"
 	"github.com/universal-sso/universal-sso/pkg/sso/oidc/oidctest"
 )
 
@@ -43,6 +44,8 @@ func wrap(h http.Handler, getenv func(string) string) (http.Handler, error) {
 	mux.Handle("/idp/okta/", okta.Handler())
 	mux.Handle("/idp/auth0/", auth0.Handler())
 	mux.Handle("/idp/azure/", azure.Handler())
+	// Plain OAuth 2.0 (no ID token). Credentials match tests/e2e.sh.
+	mux.Handle("/idp/oauth2/", oauth2test.New("e2e-oauth2", "e2e-value").Handler())
 	mux.Handle("/", h)
 	return mux, nil
 }

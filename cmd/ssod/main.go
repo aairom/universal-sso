@@ -1,6 +1,6 @@
 // Command ssod runs the Universal SSO gateway with the mock provider and,
-// when configured, the Google, Okta, Auth0 and Microsoft Entra (id "azure")
-// providers.
+// when configured, the Google, Okta, Auth0, Microsoft Entra (id "azure") and
+// generic OAuth 2.0 (id "oauth2") providers.
 //
 // Configuration (environment, see .env.example):
 //
@@ -18,6 +18,9 @@
 //	                                     AUDIENCE (optional), ROLES_CLAIM (optional)
 //	SSO_PROVIDERS_AZURE_*                CLIENT_ID, CLIENT_SECRET, TENANT_ID, REDIRECT_URL (optional),
 //	                                     ALLOWED_TENANTS (optional, multi-tenant), AUTHORITY (optional)
+//	SSO_PROVIDERS_OAUTH2_*               CLIENT_ID, CLIENT_SECRET, AUTH_URL, TOKEN_URL, USERINFO_URL,
+//	                                     REDIRECT_URL (optional), SCOPES (optional), USER_ID_FIELD (default id),
+//	                                     AUTH_STYLE (basic default, or post), REVOKE_URL (optional)
 //
 // A vendor whose client id is empty or an unedited sample stays disabled.
 //
@@ -118,7 +121,7 @@ func build(getenv func(string) string) (*sso.Manager, error) {
 	for _, v := range []struct {
 		name string
 		from func(func(string) string) (sso.Provider, error)
-	}{{"okta", oktaFromEnv}, {"auth0", auth0FromEnv}, {"azure", azureFromEnv}} {
+	}{{"okta", oktaFromEnv}, {"auth0", auth0FromEnv}, {"azure", azureFromEnv}, {"oauth2", oauth2FromEnv}} {
 		vp, err := v.from(getenv)
 		if err != nil {
 			return nil, fmt.Errorf("%s provider: %w", v.name, err)

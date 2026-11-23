@@ -129,6 +129,58 @@ func TestErrorMapping(t *testing.T) {
 		}
 	}
 }
+func TestPostCallback(t *testing.T) {
+	srv := testServer(t)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	post := func(provider string, form url.Values) int {
+		t.Helper()
+		resp, err := client.PostForm(srv.URL+"/auth/"+provider+"/callback", form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if got := post("mock", url.Values{"RelayState": {"forged"}, "SAMLResponse": {"x"}}); got != http.StatusBadRequest {
+		t.Fatalf("forged RelayState: got %d want 400", got)
+	}
+	if got := post("nope", url.Values{"RelayState": {"x"}}); got != http.StatusNotFound {
+		t.Fatalf("unknown provider: got %d want 404", got)
+	}
+	if got := post("mock", url.Values{"error": {"access_denied"}}); got != http.StatusUnauthorized {
+		t.Fatalf("IdP error: got %d want 401", got)
+	}
+
+	// A genuine state reaches the provider, which (mock) wants a code, not a
+	// SAML Response, and so refuses it. The state must be consumed anyway.
+	resp, err := client.Get(srv.URL + "/auth/mock/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	loc, _ := url.Parse(resp.Header.Get("Location"))
+	state := loc.Query().Get("state")
+	if got := post("mock", url.Values{"RelayState": {state}, "SAMLResponse": {"x"}}); got != http.StatusBadRequest {
+		t.Fatalf("mock provider given SAMLResponse: got %d want 400", got)
+	}
+	if got := post("mock", url.Values{"RelayState": {state}, "SAMLResponse": {"x"}}); got != http.StatusBadRequest {
+		t.Fatalf("replayed RelayState: got %d want 400", got)
+	}
+}
+
+func TestPostCallbackRejectsOversizedBody(t *testing.T) {
+	srv := testServer(t)
+	body := strings.NewReader("SAMLResponse=" + strings.Repeat("A", maxFormBytes+10))
+	resp, err := http.Post(srv.URL+"/auth/mock/callback", "application/x-www-form-urlencoded", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("oversized body: got %d want 400", resp.StatusCode)
+	}
+}
 
 func envMap(m map[string]string) func(string) string {
 	m["SSO_STATE_SECRET"] = strings.Repeat("s", 32)

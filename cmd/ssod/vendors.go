@@ -7,6 +7,7 @@ import (
 	"github.com/universal-sso/universal-sso/pkg/sso"
 	"github.com/universal-sso/universal-sso/pkg/sso/auth0"
 	"github.com/universal-sso/universal-sso/pkg/sso/entra"
+	"github.com/universal-sso/universal-sso/pkg/sso/oauth2"
 	"github.com/universal-sso/universal-sso/pkg/sso/okta"
 )
 
@@ -65,6 +66,31 @@ func auth0FromEnv(getenv func(string) string) (sso.Provider, error) {
 		IssuerURL:  getenv(prefix + "_ISSUER_URL"),
 		Audience:   getenv(prefix + "_AUDIENCE"),
 		RolesClaim: getenv(prefix + "_ROLES_CLAIM"),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// oauth2FromEnv builds the generic OAuth 2.0 provider (id "oauth2") or returns
+// (nil, nil). The authorization, token and profile URLs come only from the
+// environment, never from request data.
+func oauth2FromEnv(getenv func(string) string) (sso.Provider, error) {
+	const prefix = "SSO_PROVIDERS_OAUTH2"
+	id, secret, redirect, ok, err := vendorEnv(getenv, "oauth2", prefix)
+	if !ok || err != nil {
+		return nil, err
+	}
+	p, err := oauth2.New(oauth2.Config{
+		ID: "oauth2", ClientID: id, ClientSecret: secret, RedirectURL: redirect,
+		AuthURL:     getenv(prefix + "_AUTH_URL"),
+		TokenURL:    getenv(prefix + "_TOKEN_URL"),
+		UserinfoURL: getenv(prefix + "_USERINFO_URL"),
+		RevokeURL:   getenv(prefix + "_REVOKE_URL"),
+		Scopes:      strings.Fields(getenv(prefix + "_SCOPES")),
+		UserIDField: getenv(prefix + "_USER_ID_FIELD"),
+		AuthStyle:   getenv(prefix + "_AUTH_STYLE"),
 	})
 	if err != nil {
 		return nil, err

@@ -17,6 +17,8 @@ import (
 //	GET /providers                    registered provider IDs
 //	GET /auth/{provider}/login        redirect to the IdP authorization URL
 //	GET /auth/{provider}/callback     complete login, return the user profile
+//	POST /auth/{provider}/callback    same for SAML HTTP-POST binding (form fields
+//	                                  SAMLResponse and RelayState, which is the state)
 func newHandler(m *sso.Manager) http.Handler {
 	mux := http.NewServeMux()
 
@@ -67,8 +69,33 @@ func newHandler(m *sso.Manager) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"provider_id": res.ProviderID, "user": res.User})
 	})
 
+	// SAML IdPs deliver the Response by HTTP-POST. RelayState carries the
+	// signed state issued by BeginLogin, so the Manager treats it like any
+	// other callback state.
+	mux.HandleFunc("POST /auth/{provider}/callback", func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+		if err := r.ParseForm(); err != nil {
+			writeError(w, sso.NewError(sso.ErrCodeInvalidToken, "unreadable form body", http.StatusBadRequest, err))
+			return
+		}
+		res, err := m.CompleteLogin(r.Context(), r.PathValue("provider"), sso.CallbackRequest{
+			State:        r.PostForm.Get("RelayState"),
+			SAMLResponse: r.PostForm.Get("SAMLResponse"),
+			Error:        r.PostForm.Get("error"),
+			ErrorDesc:    r.PostForm.Get("error_description"),
+		})
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"provider_id": res.ProviderID, "user": res.User})
+	})
+
 	return mux
 }
+
+// maxFormBytes bounds the POST callback body (a base64 SAML Response).
+const maxFormBytes = 1 << 20
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
