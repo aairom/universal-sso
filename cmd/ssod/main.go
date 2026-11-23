@@ -121,7 +121,7 @@ func build(getenv func(string) string) (*sso.Manager, error) {
 	for _, v := range []struct {
 		name string
 		from func(func(string) string) (sso.Provider, error)
-	}{{"okta", oktaFromEnv}, {"auth0", auth0FromEnv}, {"azure", azureFromEnv}, {"oauth2", oauth2FromEnv}} {
+	}{{"okta", oktaFromEnv}, {"auth0", auth0FromEnv}, {"azure", azureFromEnv}, {"oauth2", oauth2FromEnv}, {"saml", samlFromEnv}} {
 		vp, err := v.from(getenv)
 		if err != nil {
 			return nil, fmt.Errorf("%s provider: %w", v.name, err)

@@ -9,6 +9,7 @@ import (
 	"github.com/universal-sso/universal-sso/pkg/sso/entra"
 	"github.com/universal-sso/universal-sso/pkg/sso/oauth2"
 	"github.com/universal-sso/universal-sso/pkg/sso/okta"
+	"github.com/universal-sso/universal-sso/pkg/sso/saml"
 )
 
 // legacyOktaSampleID is the client id older copies of .env.example shipped.
@@ -91,6 +92,45 @@ func oauth2FromEnv(getenv func(string) string) (sso.Provider, error) {
 		Scopes:      strings.Fields(getenv(prefix + "_SCOPES")),
 		UserIDField: getenv(prefix + "_USER_ID_FIELD"),
 		AuthStyle:   getenv(prefix + "_AUTH_STYLE"),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// samlFromEnv builds the SAML 2.0 provider (id "saml") or returns (nil, nil).
+// SAML has no client id or secret: it is enabled when SP_ENTITY_ID is set to a
+// real value. Then an IdP metadata URL or file is required, and a missing one
+// is a half-finished setup (an error), not a silent skip.
+func samlFromEnv(getenv func(string) string) (sso.Provider, error) {
+	const prefix = "SSO_PROVIDERS_SAML"
+	entity := getenv(prefix + "_SP_ENTITY_ID")
+	if isPlaceholder(entity) {
+		return nil, nil
+	}
+	metaURL, metaFile := getenv(prefix+"_IDP_METADATA_URL"), getenv(prefix+"_IDP_METADATA_FILE")
+	if isPlaceholder(metaURL) {
+		metaURL = ""
+	}
+	if isPlaceholder(metaFile) {
+		metaFile = ""
+	}
+	if metaURL == "" && metaFile == "" {
+		return nil, fmt.Errorf("%s_IDP_METADATA_URL or %s_IDP_METADATA_FILE is not set (SP entity id is configured)", prefix, prefix)
+	}
+	acs := getenv(prefix + "_ACS_URL")
+	if acs == "" {
+		base := strings.TrimRight(getenv("SSO_SERVER_BASE_URL"), "/")
+		if base == "" {
+			return nil, fmt.Errorf("set %s_ACS_URL or SSO_SERVER_BASE_URL", prefix)
+		}
+		acs = base + "/auth/saml/callback"
+	}
+	p, err := saml.New(saml.Config{
+		ID: "saml", SPEntityID: entity, ACSURL: acs,
+		IDPMetadataURL: metaURL, IDPMetadataFile: metaFile,
+		SPCertFile: getenv(prefix + "_SP_CERT_FILE"), SPKeyFile: getenv(prefix + "_SP_KEY_FILE"),
 	})
 	if err != nil {
 		return nil, err

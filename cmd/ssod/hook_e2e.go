@@ -14,6 +14,7 @@ import (
 
 	"github.com/universal-sso/universal-sso/pkg/sso/oauth2/oauth2test"
 	"github.com/universal-sso/universal-sso/pkg/sso/oidc/oidctest"
+	"github.com/universal-sso/universal-sso/pkg/sso/saml/samltest"
 )
 
 const e2eTenant = "11111111-1111-1111-1111-111111111111"
@@ -46,6 +47,14 @@ func wrap(h http.Handler, getenv func(string) string) (http.Handler, error) {
 	mux.Handle("/idp/azure/", azure.Handler())
 	// Plain OAuth 2.0 (no ID token). Credentials match tests/e2e.sh.
 	mux.Handle("/idp/oauth2/", oauth2test.New("e2e-oauth2", "e2e-value").Handler())
+	// SAML 2.0. Metadata and the SSO endpoint share the gateway's port; the
+	// identities match tests/e2e.sh.
+	mux.Handle("/idp/saml/", samltest.New(samltest.Config{
+		EntityID:   origin + "/idp/saml",
+		SSOURL:     origin + "/idp/saml/sso",
+		SPEntityID: origin + "/auth/saml/metadata",
+		ACSURL:     origin + "/auth/saml/callback",
+	}).Handler())
 	mux.Handle("/", h)
 	return mux, nil
 }

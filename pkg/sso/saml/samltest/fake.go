@@ -75,6 +75,9 @@ type Opts struct {
 	AssertionID  string
 	NotBefore    time.Time // Conditions NotBefore (default: omitted)
 	NotOnOrAfter time.Time // Conditions and confirmation (default: now + 5 minutes)
+	// CondNotOnOrAfter, when set, replaces NotOnOrAfter on <Conditions> only, so
+	// the two expiry checks can be told apart.
+	CondNotOnOrAfter time.Time
 
 	SHA1     bool // sign with RSA-SHA1 and a SHA-1 digest
 	WrongKey bool // sign with a key that is not in the metadata
@@ -216,7 +219,11 @@ func (f *Fake) assertion(o Opts, now time.Time) *etree.Element {
 	if !o.NotBefore.IsZero() {
 		cond.CreateAttr("NotBefore", stamp(o.NotBefore))
 	}
-	cond.CreateAttr("NotOnOrAfter", stamp(until))
+	condUntil := until
+	if !o.CondNotOnOrAfter.IsZero() {
+		condUntil = o.CondNotOnOrAfter
+	}
+	cond.CreateAttr("NotOnOrAfter", stamp(condUntil))
 	cond.CreateElement("saml:AudienceRestriction").CreateElement("saml:Audience").
 		SetText(or(o.Audience, f.cfg.SPEntityID))
 
