@@ -90,7 +90,7 @@ Security properties, each covered by a unit test: only RS256 is accepted (`none`
 
 `pkg/sso/oidc/oidctest` is an in-process fake OIDC server. The unit tests and `tests/e2e.sh` (the gateway built with `-tags e2e`, all five example clients, four providers) run against it. That proves the code, not a live tenant. See [Examples.md](Examples.md#end-to-end-check).
 
-Example gateway clients (Rust, Go, Python, Java, C#) are described in [Examples.md](Examples.md).
+Example gateway clients (Rust, Go, Python, Java, C#) are described in [Examples.md](Examples.md). The validation gates and documentation status are summarised in the generated [Documentation-Audit.html](Documentation-Audit.html).
 
 ---
 

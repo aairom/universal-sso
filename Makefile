@@ -1,4 +1,4 @@
-.PHONY: build test test-examples test-e2e start stop restart clean google-check google-url google-exchange
+.PHONY: build test test-examples test-e2e audit-dashboard start stop restart clean google-check google-url google-exchange
 
 build:
 	go build -o .run/ssod ./cmd/ssod
@@ -12,6 +12,9 @@ test-examples:
 
 test-e2e:
 	bash tests/e2e.sh
+
+audit-dashboard:
+	python3 scripts/build_audit_dashboard.py
 
 start:
 	scripts/start.sh

@@ -26,6 +26,10 @@ The default of a client is the provider it is named after. For `oauth2` and `sam
 
 What this proves: the adapters, the gateway and the five clients work together over HTTP, including authorization code with PKCE, token exchange, ID token verification and nonce. **What it does not prove:** that a real Okta, Auth0 or Entra tenant accepts your configuration. The fake approves every request and never asks a person to sign in. A real sign-in needs your tenant, your credentials and a browser, and follows the matching `Docs/*-SSO-Setup.md` guide. The `-tags e2e` binary is for tests only and must never be deployed.
 
+## Documentation audit dashboard
+
+`make audit-dashboard` (or `python3 scripts/build_audit_dashboard.py`) runs every validation gate and writes [`Documentation-Audit.html`](Documentation-Audit.html): a self-contained page with a documentation status matrix, adapter code excerpts, configuration schemas, gate timings, coverage charts, outdated pages and open items. It takes several minutes because it runs the test gate and the e2e suite. `--skip-gates` builds a layout preview without running them. The page states the same limit as above: the adapters were tested against a fake IdP, not live tenants.
+
 ## What each client does
 
 ```mermaid
