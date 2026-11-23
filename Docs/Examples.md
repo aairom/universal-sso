@@ -30,6 +30,34 @@ What this proves: the adapters, the gateway and the five clients work together o
 
 `make audit-dashboard` (or `python3 scripts/build_audit_dashboard.py`) runs every validation gate and writes [`Documentation-Audit.html`](Documentation-Audit.html): a self-contained page with a documentation status matrix, adapter code excerpts, configuration schemas, gate timings, coverage charts, outdated pages and open items. It takes several minutes because it runs the test gate and the e2e suite. `--skip-gates` builds a layout preview without running them. The page states the same limit as above: the adapters were tested against a fake IdP, not live tenants.
 
+## Launch scripts
+
+Three scripts in `scripts/` automate the sequence that `make google-check` and `make google-url` give you for Google. All are idempotent and print what to fix when something is missing.
+
+| Script | Purpose | Trigger |
+|---|---|---|
+| `scripts/provider-check.sh <okta\|auth0\|azure> [--env FILE] [--online]` | Validate the vendor settings in `.env`: state secret, client id and secret not samples, https issuer, tenant GUID or domain, redirect URI path. `--online` also fetches the discovery document. Never prints a secret. | `make provider-check P=okta` |
+| `scripts/run-example.sh <example> [--mode M] [--provider ID]` | Preflight the toolchain, build `ssod` and the client, start a gateway, confirm the provider is registered, run `check` and `login`. | `make run-example EX=python` |
+| `scripts/sso-common.sh` | Shared helpers (`.env` reader, placeholder rules). Sourced, not run. | by the two above |
+
+Modes of `run-example.sh`:
+
+| Mode | Gateway | Credentials | What it proves |
+|---|---|---|---|
+| `mock` (default) | throw-away, mock provider only, port `18932` | none | the client works with the gateway |
+| `e2e` | throw-away, built with `-tags e2e`, **fake** Okta, Auth0 and Entra | none | the adapter and the client work together. **Not** that your tenant works |
+| `real` | the project gateway (`scripts/start.sh`) with your `.env` | yours | readiness: it validates `.env`, then prints the URL. **You** finish the sign-in in a browser |
+
+```bash
+scripts/run-example.sh python                                   # mock, no setup
+scripts/run-example.sh java --mode e2e --provider okta          # fake Okta
+scripts/provider-check.sh azure --online                        # validate your Entra settings
+scripts/run-example.sh csharp --mode real --provider azure      # your tenant, browser sign-in
+make stop                                                       # stop the real-mode gateway
+```
+
+Defaults: rust `oauth2`, go `saml`, python `auth0`, java `okta`, csharp `azure`. SAML and generic OAuth 2.0 have no gateway adapter yet, so pass `--provider` for rust and go. Prerequisites per example are the toolchains listed under "Run the tests". The scripts never print `.env` values, and a throw-away gateway is stopped when the script exits (`--keep-running` keeps it). `bash tests/scripts_test.sh` tests them with generated env files (63 checks). Real mode only reaches the sign-in page: it has not been run against a live Okta, Auth0 or Entra tenant.
+
 ## What each client does
 
 ```mermaid

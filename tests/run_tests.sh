@@ -40,6 +40,9 @@ else
   E2E_ALLOW_SKIP=1 bash "$ROOT/tests/e2e.sh" || { echo "FAIL: e2e"; RC=1; }
 fi
 
+echo "== launch scripts (provider-check.sh, run-example.sh)"
+bash "$ROOT/tests/scripts_test.sh" || { echo "FAIL: scripts"; RC=1; }
+
 if [ "${#SKIPPED[@]}" -gt 0 ]; then
   echo "SKIPPED suites: ${SKIPPED[*]}"
   [ "${REQUIRE_ALL:-0}" = 1 ] && RC=1

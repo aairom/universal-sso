@@ -1,4 +1,4 @@
-.PHONY: build test test-examples test-e2e audit-dashboard start stop restart clean google-check google-url google-exchange
+.PHONY: build test test-examples test-e2e test-scripts provider-check run-example audit-dashboard start stop restart clean google-check google-url google-exchange
 
 build:
 	go build -o .run/ssod ./cmd/ssod
@@ -12,6 +12,19 @@ test-examples:
 
 test-e2e:
 	bash tests/e2e.sh
+
+test-scripts:
+	bash tests/scripts_test.sh
+
+# Usage: make provider-check P=okta|auth0|azure
+provider-check:
+	@test -n "$(P)" || { echo "usage: make provider-check P=okta|auth0|azure"; exit 2; }
+	scripts/provider-check.sh $(P)
+
+# Usage: make run-example EX=rust|go|python|java|csharp [MODE=mock|e2e|real] [PROVIDER=id]
+run-example:
+	@test -n "$(EX)" || { echo "usage: make run-example EX=rust|go|python|java|csharp [MODE=mock|e2e|real] [PROVIDER=id]"; exit 2; }
+	scripts/run-example.sh $(EX) --mode $(or $(MODE),mock) $(if $(PROVIDER),--provider $(PROVIDER))
 
 audit-dashboard:
 	python3 scripts/build_audit_dashboard.py

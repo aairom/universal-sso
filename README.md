@@ -94,6 +94,15 @@ Okta, Auth0 and Azure AD are verified against an in-process fake OIDC server onl
 | `make restart` | stop, then start | |
 | `make clean` | `scripts/cleanup.sh [--dry-run]` | Stops the app and removes `.run/`, `node_modules`, `.venv`, `__pycache__`. |
 
+### Launch an example against a provider
+
+| Command | Script | Behaviour |
+|---|---|---|
+| `make provider-check P=okta` | `scripts/provider-check.sh <okta\|auth0\|azure> [--online]` | Validates the vendor's settings in `.env` (placeholders, https, tenant, redirect URI) and prints the redirect URI to register. Never prints secret values. Read-only. |
+| `make run-example EX=python` | `scripts/run-example.sh <rust\|go\|python\|java\|csharp> [--mode mock\|e2e\|real] [--provider ID]` | Builds the gateway and the client, starts a gateway, checks that the provider is registered and runs `check` and `login`. `mock` (default) needs no credentials. `e2e` uses fake IdPs. `real` validates your `.env`, starts the project gateway and prints the browser URL. |
+
+`scripts/run-example.sh --list` shows the example-to-provider map. The Rust and Go examples default to providers that do not exist yet (`oauth2`, `saml`), so pass `--provider okta`, `auth0`, `azure`, `google` or `mock` for them. Full usage: [Docs/Examples.md](Docs/Examples.md#launch-scripts).
+
 State lives in `.run/` (`app.pid`, `app.log`, `ssod`), which is git-ignored. Variables: `SSO_SERVER_HOST` (default `127.0.0.1`), `SSO_SERVER_PORT` (default `8080`), `SSO_STATE_SECRET` (required), `START_TIMEOUT`, `STOP_TIMEOUT`.
 
 `ssod` endpoints: `GET /` (landing page with login links), `GET /mock/authorize` (local stand-in IdP for the mock provider), `GET /healthz`, `GET /providers`, `GET /auth/{provider}/login`, `GET /auth/{provider}/callback`. It always registers `mock`, and registers `google` when `SSO_PROVIDERS_GOOGLE_CLIENT_ID` and `SSO_PROVIDERS_GOOGLE_CLIENT_SECRET` are set to real values (optional `SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN`). The registered providers are logged at startup and listed at `/providers`.
