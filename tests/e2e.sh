@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # End-to-end check: every example client signs in through the real ssod
-# handler and the real Okta, Auth0 and Entra adapters, against in-process FAKE
-# identity providers (ssod built with -tags e2e).
+# handler and the real Okta, Auth0, Entra, generic OAuth 2.0 and SAML 2.0
+# adapters, against in-process FAKE identity providers (ssod built with
+# -tags e2e).
 #
-# What this proves: the gateway adapters and the five clients work together over
-# HTTP (login redirect, authorization code + PKCE, token exchange, ID token
-# verification, nonce, profile). What it does NOT prove: that a real Okta, Auth0
-# or Entra tenant accepts your configuration. That needs your tenant and a
-# browser (see Docs/*-SSO-Setup.md).
+# What this proves: the gateway adapters and the example clients work together
+# over HTTP (login redirect, authorization code + PKCE, token exchange, ID token
+# verification, nonce, profile; for SAML the AuthnRequest, the signed Response
+# posted back, and its validation). The four OIDC/OAuth providers run with all
+# five clients. SAML runs with the Go client only, because the other clients
+# check state and PKCE parameters that a SAML redirect does not carry. What it
+# does NOT prove: that a real tenant or IdP accepts your configuration. That
+# needs your tenant and a browser (see Docs/*-SSO-Setup.md).
 #
 # Every provider x client pair must pass. A missing toolchain is a failure, not
 # a skip, unless E2E_ALLOW_SKIP=1.
@@ -68,6 +72,8 @@ export SSO_PROVIDERS_OAUTH2_AUTH_URL="$BASE/idp/oauth2/authorize"
 export SSO_PROVIDERS_OAUTH2_TOKEN_URL="$BASE/idp/oauth2/token"
 export SSO_PROVIDERS_OAUTH2_USERINFO_URL="$BASE/idp/oauth2/user"
 export SSO_PROVIDERS_OAUTH2_SCOPES="read:user user:email"
+export SSO_PROVIDERS_SAML_SP_ENTITY_ID="$BASE/auth/saml/metadata"
+export SSO_PROVIDERS_SAML_IDP_METADATA_URL="$BASE/idp/saml/metadata"
 
 "$OUT/ssod-e2e" >"$OUT/ssod.log" 2>&1 &
 SSOD_PID=$!
@@ -105,6 +111,10 @@ run_client python bash -c "cd '$ROOT/examples/auth0-python' && python3 -m sso_cl
 run_client java   bash -c "cd '$ROOT/examples/okta-java' && java -cp 'target/classes:target/lib/*' com.universalsso.client.Main login --follow"
 run_client csharp dotnet "$ROOT/examples/azure-ad-csharp/src/bin/Release/net8.0/azure-ad-csharp.dll" login --follow
 
+# SAML 2.0: Go client only (see the header).
+PROVIDERS=(saml)
+run_client go     "$OUT/saml2-go" login -follow
+
 echo "== negative checks (the gateway must refuse these)"
 neg() { # description, expected-status, url
   local got; got="$(curl -s -o /dev/null -w '%{http_code}' "$3")"
@@ -117,6 +127,14 @@ neg "unknown provider"              404 "$BASE/auth/nope/login"
 loc="$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/auth/azure/login")"
 state="$(sed -n 's/.*[?&]state=\([^&]*\).*/\1/p' <<<"$loc")"
 neg "callback with a code the IdP never issued" 401 "$BASE/auth/azure/callback?code=never-issued&state=$state"
+
+# SAML posts the Response, so the same refusals are checked on POST.
+negpost() { # description, expected-status, url, form body
+  local got; got="$(curl -s -o /dev/null -w '%{http_code}' --data "$4" "$3")"
+  if [ "$got" = "$2" ]; then echo "PASS $1 ($got)"; PASS=$((PASS+1)); else echo "FAIL $1: got $got, want $2"; FAIL=$((FAIL+1)); RC=1; fi
+}
+negpost "SAML POST with a forged RelayState" 400 "$BASE/auth/saml/callback" "SAMLResponse=AAAA&RelayState=forged"
+negpost "SAML POST without any RelayState"   400 "$BASE/auth/saml/callback" "SAMLResponse=AAAA"
 
 echo "== result: $PASS passed, $FAIL failed, $SKIP skipped"
 [ "$FAIL" -eq 0 ] || RC=1

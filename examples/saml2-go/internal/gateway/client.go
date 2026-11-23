@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -177,6 +179,19 @@ func (c *Client) FollowLocal(ctx context.Context, l *Login) (*Profile, error) {
 		if err != nil {
 			return nil, err
 		}
+		if resp.StatusCode == http.StatusOK && isHTML(resp) {
+			// A SAML IdP answers with an auto-submitting form (HTTP-POST binding).
+			// Submit it, but only back to the gateway, never to another host.
+			action, vals, err := parsePostForm(body)
+			if err != nil {
+				return nil, err
+			}
+			target, err := next.Parse(action)
+			if err != nil || target.Host != c.cfg.GatewayURL.Host {
+				return nil, ErrLeavesGateway
+			}
+			return c.postForm(ctx, target.String(), vals)
+		}
 		if resp.StatusCode == http.StatusOK {
 			var p Profile
 			if err := json.Unmarshal(body, &p); err != nil || p.User.ID == "" {
@@ -198,4 +213,62 @@ func (c *Client) FollowLocal(ctx context.Context, l *Login) (*Profile, error) {
 		next = loc
 	}
 	return nil, errors.New("too many redirects")
+}
+
+func isHTML(resp *http.Response) bool {
+	return strings.HasPrefix(strings.ToLower(resp.Header.Get("Content-Type")), "text/html")
+}
+
+var (
+	formAction = regexp.MustCompile(`(?is)<form[^>]*\saction="([^"]*)"`)
+	hiddenIn   = regexp.MustCompile(`(?is)<input[^>]*\stype="hidden"[^>]*\sname="([^"]*)"[^>]*\svalue="([^"]*)"`)
+)
+
+// parsePostForm reads the action and hidden fields of a SAML auto-post form.
+// It accepts only the two fields the HTTP-POST binding uses, so a hostile page
+// cannot make the client send anything else.
+func parsePostForm(page []byte) (string, url.Values, error) {
+	m := formAction.FindSubmatch(page)
+	if m == nil {
+		return "", nil, errors.New("IdP page is not a SAML auto-post form")
+	}
+	vals := url.Values{}
+	for _, f := range hiddenIn.FindAllSubmatch(page, -1) {
+		name := html.UnescapeString(string(f[1]))
+		if name == "SAMLResponse" || name == "RelayState" {
+			vals.Set(name, html.UnescapeString(string(f[2])))
+		}
+	}
+	if vals.Get("SAMLResponse") == "" || vals.Get("RelayState") == "" {
+		return "", nil, errors.New("IdP form has no SAMLResponse and RelayState")
+	}
+	return html.UnescapeString(string(m[1])), vals, nil
+}
+
+// postForm submits the form to the gateway and reads the profile.
+func (c *Client) postForm(ctx context.Context, target string, vals url.Values) (*Profile, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(vals.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, apiError(resp, body)
+	}
+	var p Profile
+	if err := json.Unmarshal(body, &p); err != nil || p.User.ID == "" {
+		return nil, errors.New("callback response is not a profile")
+	}
+	c.log.Info("login completed", "provider", p.ProviderID)
+	return &p, nil
 }

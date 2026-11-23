@@ -81,9 +81,9 @@ Try the full flow without any account: open `http://127.0.0.1:8080/auth/mock/log
 | Okta | Implemented, tested against a fake IdP only | [Okta-SSO-Setup.md](Okta-SSO-Setup.md) |
 | Auth0 | Implemented, tested against a fake IdP only | [Auth0-SSO-Setup.md](Auth0-SSO-Setup.md) |
 | Generic OAuth 2.0 | Implemented, tested against a fake IdP only | [OAuth2-SSO-Setup.md](OAuth2-SSO-Setup.md) |
-| SAML 2.0 | Planned | [SAML-SSO-Setup.md](SAML-SSO-Setup.md) |
+| SAML 2.0 | Implemented (SP-initiated Web Browser SSO), tested against a fake IdP only | [SAML-SSO-Setup.md](SAML-SSO-Setup.md) |
 
-Okta, Auth0, Azure AD / Entra ID and generic OAuth 2.0 are registered when their `SSO_PROVIDERS_<NAME>_CLIENT_ID` and `_CLIENT_SECRET` are set to real values in `.env` (OAuth 2.0 also needs `_AUTH_URL`, `_TOKEN_URL` and `_USERINFO_URL`). They are covered by unit tests and an end-to-end run against in-process fake servers (`bash tests/e2e.sh`). **They have not been signed in against a live tenant or provider**: do that once with your own account following the guide. Check the settings first with `make provider-check P=okta|auth0|azure|oauth2`. SAML 2.0 is planned, and `ssod` answers `404 PROVIDER_NOT_FOUND` for it.
+Okta, Auth0, Azure AD / Entra ID and generic OAuth 2.0 are registered when their `SSO_PROVIDERS_<NAME>_CLIENT_ID` and `_CLIENT_SECRET` are set to real values in `.env` (OAuth 2.0 also needs `_AUTH_URL`, `_TOKEN_URL` and `_USERINFO_URL`). They are covered by unit tests and an end-to-end run against in-process fake servers (`bash tests/e2e.sh`). **They have not been signed in against a live tenant or provider**: do that once with your own account following the guide. Check the settings first with `make provider-check P=okta|auth0|azure|oauth2|saml`. SAML 2.0 is registered when `SSO_PROVIDERS_SAML_SP_ENTITY_ID` is set to a real value together with IdP metadata (`SSO_PROVIDERS_SAML_IDP_METADATA_URL` or `_IDP_METADATA_FILE`); it needs no client id or secret. It is also fake-IdP tested only, and only the Go example client can complete a SAML sign-in, because the other clients need OAuth `state` and PKCE parameters that a SAML redirect does not carry. SAML does not support encrypted assertions, IdP-initiated SSO, Single Logout or SHA-1.
 
 ## Sign in with Google
 
@@ -165,7 +165,7 @@ scripts/github-push.sh        # interactive helper: sets the remote, commits, pu
 |---|---|
 | `ssod: configuration error: SSO_STATE_SECRET still holds the public example value` | Run the command in [Configure](#configure) to generate your own secret. |
 | `make start` complains about `SSO_STATE_SECRET` or port 5000 | Set a non-empty secret, and pick a port other than 5000 on macOS. |
-| `404 PROVIDER_NOT_FOUND` on `/auth/<provider>/login` | The provider is not configured (empty or sample client id), or it is planned (SAML 2.0). Check `/providers` and the [status table](#provider-status). |
+| `404 PROVIDER_NOT_FOUND` on `/auth/<provider>/login` | The provider is not configured (empty or sample client id; for SAML 2.0, no `SP_ENTITY_ID` or no IdP metadata). Check `/providers` and the [status table](#provider-status). |
 | Google sign-in fails | Run `make google-check`, then see [Google-SSO-Setup.md](Google-SSO-Setup.md). |
 | Server not reachable | Read `.run/app.log`; `make stop` then `make start`. |
 
@@ -174,4 +174,4 @@ scripts/github-push.sh        # interactive helper: sets the remote, commits, pu
 - [Architecture.md](Architecture.md): components, protocols, security model.
 - [Examples.md](Examples.md): command-line gateway clients in Rust, Go, Python, Java and C#.
 - Provider guides in the [status table](#provider-status).
-- The SAML 2.0 adapter is the next planned work.
+- Open items: signing in against a live tenant or IdP for Okta, Auth0, Entra, OAuth 2.0 and SAML 2.0 (everything so far ran against in-process fakes), and a Node.js client (none exists).

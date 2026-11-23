@@ -90,6 +90,34 @@ cp "$TMP/oauth2.env" "$TMP/oauth2-style.env"; echo "SSO_PROVIDERS_OAUTH2_AUTH_ST
 expect "provider-check oauth2: unknown auth style fails" 1 scripts/provider-check.sh oauth2 --env "$TMP/oauth2-style.env"
 cp "$TMP/oauth2.env" "$TMP/oauth2-post.env"; echo "SSO_PROVIDERS_OAUTH2_AUTH_STYLE=post" >>"$TMP/oauth2-post.env"
 expect "provider-check oauth2: auth style post passes" 0 scripts/provider-check.sh oauth2 --env "$TMP/oauth2-post.env"
+
+# SAML has no client id or secret, so it is checked on entity id and IdP metadata.
+good saml SSO_PROVIDERS_SAML_SP_ENTITY_ID=http://localhost:8080/auth/saml/metadata SSO_PROVIDERS_SAML_IDP_METADATA_URL=https://idp.corp.test/metadata
+expect "provider-check saml: valid settings pass" 0 scripts/provider-check.sh saml --env "$TMP/saml.env"
+contains "provider-check saml: shows the ACS URL to register" "/auth/saml/callback"
+lacks "provider-check saml: never prints the state secret" "$SECRET"
+expect "provider-check saml: a second run gives the same result (idempotent)" 0 scripts/provider-check.sh saml --env "$TMP/saml.env"
+sed 's#^SSO_PROVIDERS_SAML_SP_ENTITY_ID=.*#SSO_PROVIDERS_SAML_SP_ENTITY_ID=saml-sp-entity-id-placeholder#' "$TMP/saml.env" >"$TMP/saml-ph.env"
+expect "provider-check saml: sample entity id fails" 1 scripts/provider-check.sh saml --env "$TMP/saml-ph.env"
+contains "provider-check saml: explains the provider stays off" "switched off"
+grep -v '^SSO_PROVIDERS_SAML_IDP_METADATA_URL=' "$TMP/saml.env" >"$TMP/saml-nometa.env"
+expect "provider-check saml: no metadata source fails" 1 scripts/provider-check.sh saml --env "$TMP/saml-nometa.env"
+sed 's#^SSO_PROVIDERS_SAML_IDP_METADATA_URL=.*#SSO_PROVIDERS_SAML_IDP_METADATA_URL=http://idp.corp.test/metadata#' "$TMP/saml.env" >"$TMP/saml-http.env"
+expect "provider-check saml: http metadata URL on a non-loopback host fails" 1 scripts/provider-check.sh saml --env "$TMP/saml-http.env"
+cp "$TMP/saml.env" "$TMP/saml-both.env"; echo "SSO_PROVIDERS_SAML_IDP_METADATA_FILE=$TMP/idp.xml" >>"$TMP/saml-both.env"
+expect "provider-check saml: URL and file together fail" 1 scripts/provider-check.sh saml --env "$TMP/saml-both.env"
+printf '<md:EntityDescriptor><md:IDPSSODescriptor/></md:EntityDescriptor>' >"$TMP/idp.xml"
+printf '<md:EntityDescriptor><md:SPSSODescriptor/></md:EntityDescriptor>' >"$TMP/sp.xml"
+{ grep -v '^SSO_PROVIDERS_SAML_IDP_METADATA_URL=' "$TMP/saml.env"; echo "SSO_PROVIDERS_SAML_IDP_METADATA_FILE=$TMP/idp.xml"; } >"$TMP/saml-file.env"
+expect "provider-check saml: IdP metadata file passes" 0 scripts/provider-check.sh saml --env "$TMP/saml-file.env"
+{ grep -v '^SSO_PROVIDERS_SAML_IDP_METADATA_URL=' "$TMP/saml.env"; echo "SSO_PROVIDERS_SAML_IDP_METADATA_FILE=$TMP/sp.xml"; } >"$TMP/saml-sp.env"
+expect "provider-check saml: a file that is not IdP metadata fails" 1 scripts/provider-check.sh saml --env "$TMP/saml-sp.env"
+{ grep -v '^SSO_PROVIDERS_SAML_IDP_METADATA_URL=' "$TMP/saml.env"; echo "SSO_PROVIDERS_SAML_IDP_METADATA_FILE=$TMP/missing.xml"; } >"$TMP/saml-miss.env"
+expect "provider-check saml: a missing metadata file fails" 1 scripts/provider-check.sh saml --env "$TMP/saml-miss.env"
+cp "$TMP/saml.env" "$TMP/saml-cert.env"; echo "SSO_PROVIDERS_SAML_SP_CERT_FILE=$TMP/idp.xml" >>"$TMP/saml-cert.env"
+expect "provider-check saml: cert without key fails" 1 scripts/provider-check.sh saml --env "$TMP/saml-cert.env"
+echo "SSO_PROVIDERS_SAML_SP_KEY_FILE=$TMP/idp.xml" >>"$TMP/saml-cert.env"
+expect "provider-check saml: cert and key that exist pass" 0 scripts/provider-check.sh saml --env "$TMP/saml-cert.env"
 expect "provider-check: missing env file fails with a hint" 1 scripts/provider-check.sh okta --env "$TMP/none.env"
 contains "provider-check: hint names .env.example" "cp .env.example .env"
 expect "provider-check: unknown provider is a usage error" 2 scripts/provider-check.sh nope
@@ -105,8 +133,9 @@ expect "run-example: port 5000 refused" 2 scripts/run-example.sh python --port 5
 expect "run-example: low port refused" 2 scripts/run-example.sh python --port 80
 expect "run-example: option without value" 2 scripts/run-example.sh python --mode
 expect "run-example: mock mode refuses a vendor provider" 2 scripts/run-example.sh python --mode mock --provider okta
-expect "run-example: saml has no adapter" 2 scripts/run-example.sh go --mode e2e
-contains "run-example: explains saml is planned" "no 'saml' adapter yet"
+expect "run-example: saml is refused for a client that needs state and PKCE" 2 scripts/run-example.sh python --mode e2e --provider saml
+contains "run-example: explains saml works with go only" "saml works with the go example only"
+expect "run-example: saml is accepted for go (default provider, toolchain check only)" 0 scripts/run-example.sh go --mode e2e --check-only
 expect "run-example: oauth2 is accepted (rust default, toolchain check only)" 0 scripts/run-example.sh rust --mode e2e --check-only
 expect "run-example: google is real-only" 2 scripts/run-example.sh python --mode e2e --provider google
 expect "run-example --check-only builds nothing" 0 scripts/run-example.sh python --mode mock --check-only
@@ -123,6 +152,8 @@ contains "run-example e2e: labels the IdP as fake" "FAKE identity provider"
 contains "run-example e2e: signed in via okta" "signed in via okta"
 expect "run-example python e2e oauth2: fake IdP sign-in" 0 scripts/run-example.sh python --mode e2e --provider oauth2 --port "$PORT"
 contains "run-example e2e oauth2: signed in via oauth2" "signed in via oauth2"
+expect "run-example go e2e saml: fake IdP sign-in (AuthnRequest, signed Response)" 0 scripts/run-example.sh go --mode e2e --provider saml --port "$PORT"
+contains "run-example e2e saml: signed in via saml" "signed in via saml"
 
 echo "== scripts: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

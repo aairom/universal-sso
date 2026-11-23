@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Validate the gateway settings for one adapter before you try to sign in.
-# This is the Okta / Auth0 / Entra / generic OAuth 2.0 counterpart of `make google-check`.
+# This is the Okta / Auth0 / Entra / generic OAuth 2.0 / SAML 2.0 counterpart of `make google-check`.
 #
-# Usage:   scripts/provider-check.sh <okta|auth0|azure|oauth2> [--env FILE] [--online]
+# Usage:   scripts/provider-check.sh <okta|auth0|azure|oauth2|saml> [--env FILE] [--online]
 #   --env FILE   env file to read (default: .env in the project root)
 #   --online     also fetch the provider's OpenID discovery document (needs network).
 #                oauth2 has no discovery document, so --online checks nothing for it.
+#                saml fetches the IdP metadata URL (when one is set) and checks it is XML.
 #
 # Prerequisites: bash, grep, sed. curl only for --online.
 # Reads (never prints secret values): SSO_STATE_SECRET, SSO_SERVER_*, and for the chosen
-# provider SSO_PROVIDERS_<OKTA|AUTH0|AZURE|OAUTH2>_{CLIENT_ID,CLIENT_SECRET,REDIRECT_URL,...}.
-# See .env.example and Docs/<Okta|Auth0|Azure-AD|OAuth2>-SSO-Setup.md.
+# provider SSO_PROVIDERS_<OKTA|AUTH0|AZURE|OAUTH2>_{CLIENT_ID,CLIENT_SECRET,REDIRECT_URL,...}, or for
+# saml SSO_PROVIDERS_SAML_{SP_ENTITY_ID,IDP_METADATA_URL,IDP_METADATA_FILE,ACS_URL,SP_CERT_FILE,SP_KEY_FILE}.
+# See .env.example and Docs/<Okta|Auth0|Azure-AD|OAuth2|SAML>-SSO-Setup.md.
 #
 # Read-only and idempotent: it changes nothing. Exit: 0 ready, 1 at least one FAIL, 2 bad usage.
 set -uo pipefail
@@ -18,7 +20,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/sso-common.sh
 . "$ROOT/scripts/sso-common.sh"
 
-usage() { echo "usage: provider-check.sh <okta|auth0|azure|oauth2> [--env FILE] [--online]" >&2; exit 2; }
+usage() { echo "usage: provider-check.sh <okta|auth0|azure|oauth2|saml> [--env FILE] [--online]" >&2; exit 2; }
 
 PROVIDER="${1:-}"; [ $# -gt 0 ] && shift
 ENV_FILE="$ROOT/.env"; ONLINE=0
@@ -35,6 +37,7 @@ case "$PROVIDER" in
   auth0) PREFIX=SSO_PROVIDERS_AUTH0; LABEL=Auth0; GUIDE=Docs/Auth0-SSO-Setup.md ;;
   azure) PREFIX=SSO_PROVIDERS_AZURE; LABEL="Microsoft Entra ID"; GUIDE=Docs/Azure-AD-SSO-Setup.md ;;
   oauth2) PREFIX=SSO_PROVIDERS_OAUTH2; LABEL="generic OAuth 2.0"; GUIDE=Docs/OAuth2-SSO-Setup.md ;;
+  saml) PREFIX=SSO_PROVIDERS_SAML; LABEL="SAML 2.0"; GUIDE=Docs/SAML-SSO-Setup.md ;;
   *) usage ;;
 esac
 
@@ -70,19 +73,21 @@ else
   ok "SSO_SERVER_PORT is $PORT"
 fi
 
-# --- provider credentials ---
-CID="$(get "${PREFIX}_CLIENT_ID")"
-CSEC="$(get "${PREFIX}_CLIENT_SECRET")"
-if is_placeholder "$CID"; then
-  fail "${PREFIX}_CLIENT_ID is empty or a sample value: the gateway keeps $PROVIDER switched off" \
-    "paste the client id from your $LABEL application ($GUIDE)"
-else
-  ok "${PREFIX}_CLIENT_ID is set"
-fi
-if is_placeholder "$CSEC"; then
-  fail "${PREFIX}_CLIENT_SECRET is empty or a sample value" "paste the client secret from $LABEL (value is never printed here)"
-else
-  ok "${PREFIX}_CLIENT_SECRET is set (value not shown)"
+# --- provider credentials (SAML has none: it is identified by its entity id and metadata) ---
+if [ "$PROVIDER" != saml ]; then
+  CID="$(get "${PREFIX}_CLIENT_ID")"
+  CSEC="$(get "${PREFIX}_CLIENT_SECRET")"
+  if is_placeholder "$CID"; then
+    fail "${PREFIX}_CLIENT_ID is empty or a sample value: the gateway keeps $PROVIDER switched off" \
+      "paste the client id from your $LABEL application ($GUIDE)"
+  else
+    ok "${PREFIX}_CLIENT_ID is set"
+  fi
+  if is_placeholder "$CSEC"; then
+    fail "${PREFIX}_CLIENT_SECRET is empty or a sample value" "paste the client secret from $LABEL (value is never printed here)"
+  else
+    ok "${PREFIX}_CLIENT_SECRET is set (value not shown)"
+  fi
 fi
 
 # secure_url NAME VALUE: https, or http only for loopback (matches oidc.ValidateURL).
@@ -153,6 +158,48 @@ case "$PROVIDER" in
       DISCOVERY="${AUTH%/}/$TENANT/v2.0/.well-known/openid-configuration"
     fi
     ;;
+  saml)
+    ENTITY="$(get "${PREFIX}_SP_ENTITY_ID")"
+    if is_placeholder "$ENTITY"; then
+      fail "${PREFIX}_SP_ENTITY_ID is empty or a sample value: the gateway keeps saml switched off" \
+        "set it to the Audience / Entity ID you registered at the IdP, for example \$SSO_SERVER_BASE_URL/auth/saml/metadata"
+    else
+      ok "${PREFIX}_SP_ENTITY_ID is set to $ENTITY"
+    fi
+    MURL="$(get "${PREFIX}_IDP_METADATA_URL")"; MFILE="$(get "${PREFIX}_IDP_METADATA_FILE")"
+    is_placeholder "$MURL" && MURL=""
+    is_placeholder "$MFILE" && MFILE=""
+    if [ -n "$MURL" ] && [ -n "$MFILE" ]; then
+      fail "set only one of ${PREFIX}_IDP_METADATA_URL and ${PREFIX}_IDP_METADATA_FILE" "remove one of them"
+    elif [ -n "$MURL" ]; then
+      secure_url "${PREFIX}_IDP_METADATA_URL" "$MURL" && ok "${PREFIX}_IDP_METADATA_URL is a valid URL"
+      DISCOVERY="$MURL"
+    elif [ -n "$MFILE" ]; then
+      case "$MFILE" in /*) MPATH="$MFILE" ;; *) MPATH="$ROOT/${MFILE#./}" ;; esac
+      if [ ! -r "$MPATH" ]; then
+        fail "${PREFIX}_IDP_METADATA_FILE is not a readable file: $MFILE" "download the IdP metadata XML there ($GUIDE)"
+      elif ! grep -q 'IDPSSODescriptor' "$MPATH"; then
+        fail "${PREFIX}_IDP_METADATA_FILE has no IDPSSODescriptor: it is not IdP metadata" "download the metadata from the IdP, not the SP"
+      else
+        ok "${PREFIX}_IDP_METADATA_FILE is readable IdP metadata"
+      fi
+    else
+      fail "neither ${PREFIX}_IDP_METADATA_URL nor ${PREFIX}_IDP_METADATA_FILE is set" "copy the metadata URL from the IdP ($GUIDE)"
+    fi
+    CERT="$(get "${PREFIX}_SP_CERT_FILE")"; KEY="$(get "${PREFIX}_SP_KEY_FILE")"
+    if [ -n "$CERT" ] || [ -n "$KEY" ]; then
+      if [ -z "$CERT" ] || [ -z "$KEY" ]; then
+        fail "${PREFIX}_SP_CERT_FILE and ${PREFIX}_SP_KEY_FILE must be set together" "set both or neither"
+      else
+        for f in "$CERT" "$KEY"; do
+          case "$f" in /*) fp="$f" ;; *) fp="$ROOT/${f#./}" ;; esac
+          [ -r "$fp" ] && ok "$f is readable" || fail "$f is not a readable file" "create it with openssl ($GUIDE)"
+        done
+      fi
+    else
+      ok "AuthnRequests are not signed (SP_CERT_FILE and SP_KEY_FILE unset), which most IdPs accept"
+    fi
+    ;;
   oauth2)
     for v in AUTH_URL TOKEN_URL USERINFO_URL; do
       val="$(get "${PREFIX}_$v")"
@@ -175,37 +222,44 @@ esac
 
 # --- redirect URI: must match the IdP console exactly ---
 BASE="$(get SSO_SERVER_BASE_URL)"
-REDIRECT="$(get "${PREFIX}_REDIRECT_URL")"
+RVAR="${PREFIX}_REDIRECT_URL"; [ "$PROVIDER" = saml ] && RVAR="${PREFIX}_ACS_URL"
+REDIRECT="$(get "$RVAR")"
 EXPECT_PATH="/auth/$PROVIDER/callback"
 if [ -z "$REDIRECT" ]; then
   if [ -z "$BASE" ]; then
-    fail "set ${PREFIX}_REDIRECT_URL or SSO_SERVER_BASE_URL" "for example http://localhost:$PORT$EXPECT_PATH"
+    fail "set $RVAR or SSO_SERVER_BASE_URL" "for example http://localhost:$PORT$EXPECT_PATH"
   else
     REDIRECT="${BASE%/}$EXPECT_PATH"
     ok "redirect URI defaults to $REDIRECT"
   fi
 else
   if [[ "$REDIRECT" != *"$EXPECT_PATH" ]]; then
-    warn "${PREFIX}_REDIRECT_URL does not end in $EXPECT_PATH, the path the gateway serves" "use $EXPECT_PATH"
-  elif secure_url "${PREFIX}_REDIRECT_URL" "$REDIRECT"; then
-    ok "${PREFIX}_REDIRECT_URL ends in $EXPECT_PATH"
+    warn "$RVAR does not end in $EXPECT_PATH, the path the gateway serves" "use $EXPECT_PATH"
+  elif secure_url "$RVAR" "$REDIRECT"; then
+    ok "$RVAR ends in $EXPECT_PATH"
   fi
   if [ -n "$BASE" ] && [[ "$REDIRECT" != "${BASE%/}"/* ]]; then
     warn "redirect URI host differs from SSO_SERVER_BASE_URL ($BASE)" "they should point at the same gateway"
   fi
 fi
-[ -n "$REDIRECT" ] && echo "       register this exact redirect URI in $LABEL: $REDIRECT"
+[ -n "$REDIRECT" ] && if [ -n "$REDIRECT" ]; then
+  if [ "$PROVIDER" = saml ]; then echo "       register this exact ACS URL (Reply URL) at the IdP: $REDIRECT"
+  else echo "       register this exact redirect URI in $LABEL: $REDIRECT"; fi
+fi
 
 # --- optional network check ---
 if [ "$ONLINE" -eq 1 ]; then
   if [ "$PROVIDER" = oauth2 ]; then
     warn "--online has nothing to check for oauth2: it has no discovery document"
+  elif [ "$PROVIDER" = saml ] && [ -z "$DISCOVERY" ]; then
+    warn "nothing to fetch: the metadata is a local file or not set"
   elif [ -z "$DISCOVERY" ]; then
     warn "skipped the discovery check: the issuer settings above are not usable yet"
   elif ! command -v curl >/dev/null 2>&1; then
     fail "--online needs curl, which is not installed" "install curl or drop --online"
   else
-    if body="$(curl -fsS --max-time 10 "$DISCOVERY" 2>&1)" && grep -q '"authorization_endpoint"' <<<"$body"; then
+    MARK='"authorization_endpoint"'; [ "$PROVIDER" = saml ] && MARK='IDPSSODescriptor'
+    if body="$(curl -fsS --max-time 10 "$DISCOVERY" 2>&1)" && grep -q "$MARK" <<<"$body"; then
       ok "discovery document reachable at ${DISCOVERY%%/.well-known*}/..."
     else
       fail "could not fetch a discovery document from ${DISCOVERY%%/.well-known*}/..." "check the issuer / tenant spelling and your network"

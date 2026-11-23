@@ -11,16 +11,17 @@
 #   mock  (default) Needs no credentials. Builds ssod, starts a throw-away gateway with only the
 #                   mock provider, builds the client and completes a full sign-in with --follow.
 #   e2e             Same, but ssod is built with -tags e2e and serves in-process FAKE Okta, Auth0,
-#                   Entra and generic OAuth 2.0 servers. Proves the adapters and the client work
-#                   together. It does NOT prove your real tenant works.
-#                   --provider: okta, auth0, azure, oauth2 or mock.
+#                   Entra, generic OAuth 2.0 and SAML 2.0 servers. Proves the adapters and the
+#                   client work together. It does NOT prove your real tenant works.
+#                   --provider: okta, auth0, azure, oauth2, saml (go only) or mock.
 #   real            Uses YOUR .env: validates it (provider-check.sh / ssoctl), starts the project
 #                   gateway through scripts/start.sh, builds the client and prints the browser URL.
 #                   You finish the sign-in in a browser; the callback shows your profile as JSON.
 #
 # Default provider per example: rust=oauth2, go=saml, python=auth0, java=okta, csharp=azure.
-# The SAML adapter does not exist yet, so for go pass --provider (okta, auth0, azure, oauth2,
-# google or mock) in e2e and real mode.
+# SAML works with the go example only: the other clients require the state and PKCE parameters of
+# an OAuth redirect, which a SAML redirect (SAMLRequest + RelayState) does not carry.
+# Any example can use any other provider with --provider.
 #
 # Prerequisites (checked before anything is built):
 #   all     bash, curl, Go (builds ssod; go.mod sets the version)
@@ -89,7 +90,7 @@ else
   case "$PROVIDER" in
     okta | auth0 | azure | oauth2 | mock) ;;
     google) [ "$MODE" = real ] || fail_usage "google exists only in real mode (the e2e gateway has no fake Google)" ;;
-    saml) fail_usage "the gateway has no 'saml' adapter yet (planned, see Docs/Architecture.md). Add --provider okta, auth0, azure, oauth2, google or mock" ;;
+    saml) [ "$EX" = go ] || fail_usage "saml works with the go example only (the '$EX' client requires OAuth state and PKCE parameters). Use: run-example.sh go --provider saml" ;;
     *) fail_usage "unknown provider '$PROVIDER'" ;;
   esac
 fi
@@ -182,6 +183,7 @@ else
       SSO_PROVIDERS_OAUTH2_CLIENT_ID=e2e-oauth2 SSO_PROVIDERS_OAUTH2_CLIENT_SECRET=e2e-value
       SSO_PROVIDERS_OAUTH2_AUTH_URL="$base/idp/oauth2/authorize" SSO_PROVIDERS_OAUTH2_TOKEN_URL="$base/idp/oauth2/token"
       SSO_PROVIDERS_OAUTH2_USERINFO_URL="$base/idp/oauth2/user" SSO_PROVIDERS_OAUTH2_SCOPES="read:user user:email"
+      SSO_PROVIDERS_SAML_SP_ENTITY_ID="$base/auth/saml/metadata" SSO_PROVIDERS_SAML_IDP_METADATA_URL="$base/idp/saml/metadata"
     ) # nosecret: throw-away values for the in-process fake IdPs
   fi
   echo "== starting throw-away gateway on $base"
@@ -232,6 +234,7 @@ if [ "$MODE" = real ] && [ -z "${SSO_EXPECTED_IDP_HOST+x}" ]; then
     auth0) u="$(envget "$ENV_FILE" SSO_PROVIDERS_AUTH0_ISSUER_URL)" ;;
     azure) u="$(envget "$ENV_FILE" SSO_PROVIDERS_AZURE_AUTHORITY)"; u="${u:-https://login.microsoftonline.com}" ;;
     oauth2) u="$(envget "$ENV_FILE" SSO_PROVIDERS_OAUTH2_AUTH_URL)" ;;
+    saml) u="$(envget "$ENV_FILE" SSO_PROVIDERS_SAML_IDP_METADATA_URL)" ;; # empty with a metadata file: no pin
     google) u="https://accounts.google.com" ;;
     *) u="" ;;
   esac

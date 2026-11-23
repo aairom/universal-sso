@@ -204,3 +204,109 @@ func TestHealthRejectsBadBody(t *testing.T) {
 		t.Fatal("expected unhealthy error")
 	}
 }
+
+// samlGateway mimics the SAML flow on one host: login redirects to an IdP page
+// on the same host (as the e2e build does), the page auto-posts a form, and the
+// POST callback answers with a profile.
+func samlGateway(t *testing.T, formAction string, page func(action string) string) *httptest.Server {
+	t.Helper()
+	var posted url.Values
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/saml/login", func(w http.ResponseWriter, r *http.Request) {
+		req := base64.StdEncoding.EncodeToString(deflateBytes(t, `<AuthnRequest ID="_1"/>`))
+		http.Redirect(w, r, "/idp/sso?SAMLRequest="+url.QueryEscape(req)+"&RelayState=rs1", http.StatusFound)
+	})
+	mux.HandleFunc("/idp/sso", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(page(formAction)))
+	})
+	mux.HandleFunc("POST /auth/saml/callback", func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		posted = r.PostForm
+		if r.PostForm.Get("SAMLResponse") != "resp&1" || r.PostForm.Get("RelayState") != "rs1" || r.PostForm.Get("evil") != "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"code":"STATE_MISMATCH","message":"x"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"provider_id":"saml","user":{"id":"idp|u1","email":"a@example.com"}}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(func() { srv.Close(); _ = posted })
+	return srv
+}
+
+func deflateBytes(t *testing.T, s string) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	w, _ := flate.NewWriter(&b, flate.BestCompression)
+	_, _ = w.Write([]byte(s))
+	_ = w.Close()
+	return b.Bytes()
+}
+
+const goodForm = `<html><body><form method="post" action="%s">` +
+	`<input type="hidden" name="SAMLResponse" value="resp&amp;1"/>` +
+	`<input type="hidden" name="RelayState" value="rs1"/>` +
+	`<input type="hidden" name="evil" value="x"/></form></body></html>`
+
+func TestFollowLocalSubmitsSAMLForm(t *testing.T) {
+	srv := samlGateway(t, "/auth/saml/callback", func(a string) string { return strings.Replace(goodForm, "%s", a, 1) })
+	c := newTestClient(t, srv.URL, "saml")
+	l, err := c.StartLogin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := c.FollowLocal(context.Background(), l)
+	if err != nil || p.ProviderID != "saml" || p.User.ID != "idp|u1" {
+		t.Fatalf("follow: %+v %v", p, err)
+	}
+}
+
+func TestFollowLocalRefusesFormToAnotherHost(t *testing.T) {
+	srv := samlGateway(t, "https://evil.example.test/steal", func(a string) string { return strings.Replace(goodForm, "%s", a, 1) })
+	c := newTestClient(t, srv.URL, "saml")
+	l, _ := c.StartLogin(context.Background())
+	if _, err := c.FollowLocal(context.Background(), l); !errors.Is(err, ErrLeavesGateway) {
+		t.Fatalf("a form aimed at another host must not be submitted, got %v", err)
+	}
+}
+
+func TestFollowLocalRejectsBadForms(t *testing.T) {
+	for name, page := range map[string]string{
+		"not a form":    `<html>hello</html>`,
+		"no fields":     `<form method="post" action="/auth/saml/callback"></form>`,
+		"no relaystate": `<form action="/auth/saml/callback"><input type="hidden" name="SAMLResponse" value="x"/></form>`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := samlGateway(t, "", func(string) string { return page })
+			c := newTestClient(t, srv.URL, "saml")
+			l, _ := c.StartLogin(context.Background())
+			if _, err := c.FollowLocal(context.Background(), l); err == nil {
+				t.Fatal("expected an error")
+			}
+		})
+	}
+}
+
+func TestPostFormGatewayErrors(t *testing.T) {
+	srv := samlGateway(t, "/auth/saml/callback", func(a string) string {
+		return strings.Replace(strings.Replace(goodForm, "%s", a, 1), `value="resp&amp;1"`, `value="other"`, 1)
+	})
+	c := newTestClient(t, srv.URL, "saml")
+	l, _ := c.StartLogin(context.Background())
+	_, err := c.FollowLocal(context.Background(), l)
+	var api *APIError
+	if !errors.As(err, &api) || api.Code != "STATE_MISMATCH" {
+		t.Fatalf("expected the gateway error, got %v", err)
+	}
+	// An unreachable gateway on POST.
+	if _, err := c.postForm(context.Background(), "http://127.0.0.1:1/x", url.Values{}); err == nil {
+		t.Fatal("expected a transport error")
+	}
+	// A 200 that is not a profile.
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{}`)) }))
+	defer bad.Close()
+	if _, err := c.postForm(context.Background(), bad.URL, url.Values{}); err == nil {
+		t.Fatal("expected a profile error")
+	}
+}
