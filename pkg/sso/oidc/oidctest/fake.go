@@ -42,9 +42,16 @@ type Fake struct {
 	gotTokenAuth string
 	gotRevoke    url.Values
 
+	// Interactive mode (see NewInteractive): /authorize issues codes and
+	// /token verifies PKCE and mints tokens through Mint.
+	base     string
+	mint     func(clientID, nonce string) map[string]any
+	codes    map[string]authGrant
 	JWKSHits atomic.Int32
 	t        *testing.T
 }
+
+type authGrant struct{ clientID, nonce, challenge string }
 
 func b64(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 
@@ -61,8 +68,30 @@ func New(t *testing.T) *Fake {
 	return f
 }
 
+// NewInteractive returns a fake that is mounted by the caller (Handler) at the
+// public base URL base (scheme, host and any path prefix, no trailing slash).
+// Unlike New it needs no *testing.T. /authorize redirects straight back to the
+// redirect_uri with a code and the state, /token verifies the PKCE verifier,
+// and the ID token is produced by mint(clientID, nonce). It exists for the
+// end-to-end harness and is a stand-in for a real identity provider only.
+func NewInteractive(base string, mint func(clientID, nonce string) map[string]any) *Fake {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+	return &Fake{Key: key, Kid: "kid-1", revokeStatus: http.StatusOK, base: strings.TrimRight(base, "/"), mint: mint, codes: map[string]authGrant{}}
+}
+
+// Handler serves the fake. Paths are matched by suffix, so it works under any prefix.
+func (f *Fake) Handler() http.Handler { return http.HandlerFunc(f.serve) }
+
 // URL is the server base URL (no trailing slash).
-func (f *Fake) URL() string { return f.Srv.URL }
+func (f *Fake) URL() string {
+	if f.base != "" {
+		return f.base
+	}
+	return f.Srv.URL
+}
 
 // Set mutates the fake under its lock.
 func (f *Fake) Set(fn func(*Fake)) {
@@ -131,7 +160,10 @@ func (f *Fake) SignWith(key *rsa.PrivateKey, kid, alg string, claims map[string]
 	sum := sha256.Sum256([]byte(signing))
 	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, sum[:])
 	if err != nil {
-		f.t.Fatal(err)
+		if f.t != nil {
+			f.t.Fatal(err)
+		}
+		panic(err)
 	}
 	return signing + "." + b64(sig)
 }
@@ -160,6 +192,8 @@ func (f *Fake) serve(w http.ResponseWriter, r *http.Request) {
 			"kty": "RSA", "kid": kid, "alg": "RS256", "use": "sig",
 			"n": b64(key.N.Bytes()), "e": b64(big.NewInt(int64(key.E)).Bytes()),
 		}}})
+	case strings.HasSuffix(path, "/authorize"):
+		f.authorize(w, r)
 	case strings.HasSuffix(path, "/token"):
 		f.token(w, r)
 	case strings.HasSuffix(path, "/userinfo"):
@@ -186,7 +220,7 @@ func (f *Fake) serve(w http.ResponseWriter, r *http.Request) {
 // discovery serves a document whose endpoints live next to the requested
 // discovery path, so issuers with a path (Okta, Entra) work.
 func (f *Fake) discovery(w http.ResponseWriter, path string) {
-	base := f.Srv.URL + strings.TrimSuffix(path, "/.well-known/openid-configuration")
+	base := f.URL() + strings.TrimSuffix(path, "/.well-known/openid-configuration")
 	f.mu.Lock()
 	iss, noES, noRev := f.discIssuer, f.noEndSession, f.noRevoke
 	f.mu.Unlock()
@@ -212,7 +246,22 @@ func (f *Fake) token(w http.ResponseWriter, r *http.Request) {
 	f.gotForm = r.PostForm
 	f.gotTokenAuth = r.Header.Get("Authorization")
 	terr, noID, claims := f.tokenErr, f.noIDToken, f.claims
+	var grant authGrant
+	granted := false
+	if f.mint != nil && r.PostForm.Get("grant_type") == "authorization_code" {
+		grant, granted = f.codes[r.PostForm.Get("code")]
+		delete(f.codes, r.PostForm.Get("code")) // authorization codes are single use
+	}
 	f.mu.Unlock()
+	if f.mint != nil && r.PostForm.Get("grant_type") == "authorization_code" {
+		sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
+		if !granted || b64(sum[:]) != grant.challenge {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant", "error_description": "unknown code or PKCE mismatch"})
+			return
+		}
+		claims = f.mint(grant.clientID, grant.nonce)
+	}
 	if terr != "" {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": terr, "error_description": "rejected"})
@@ -226,4 +275,27 @@ func (f *Fake) token(w http.ResponseWriter, r *http.Request) {
 		out["id_token"] = f.Sign(claims)
 	}
 	_ = json.NewEncoder(w).Encode(out)
+}
+
+// authorize records the request and redirects back with a one-time code, as a
+// signed-in browser session would.
+func (f *Fake) authorize(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	redirect, err := url.Parse(q.Get("redirect_uri"))
+	if f.mint == nil || err != nil || redirect.Host == "" || q.Get("response_type") != "code" ||
+		q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "" {
+		http.Error(w, "invalid authorization request", http.StatusBadRequest)
+		return
+	}
+	buf := make([]byte, 16)
+	_, _ = rand.Read(buf)
+	code := b64(buf)
+	f.mu.Lock()
+	f.codes[code] = authGrant{clientID: q.Get("client_id"), nonce: q.Get("nonce"), challenge: q.Get("code_challenge")}
+	f.mu.Unlock()
+	rq := redirect.Query()
+	rq.Set("code", code)
+	rq.Set("state", q.Get("state"))
+	redirect.RawQuery = rq.Encode()
+	http.Redirect(w, r, redirect.String(), http.StatusFound)
 }

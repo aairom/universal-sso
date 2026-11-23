@@ -138,10 +138,14 @@ func main() {
 		log.Fatalf("ssod: configuration error: %v", err)
 	}
 
+	handler, err := wrap(newHandler(m), os.Getenv)
+	if err != nil {
+		log.Fatalf("ssod: %v", err)
+	}
 	addr := net.JoinHostPort(envOr("SSO_SERVER_HOST", "127.0.0.1"), envOr("SSO_SERVER_PORT", "8080"))
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           newHandler(m),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

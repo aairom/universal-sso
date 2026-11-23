@@ -181,6 +181,7 @@ func TestVendorEndToEnd(t *testing.T) {
 			srv := httptest.NewServer(newHandler(m))
 			defer srv.Close()
 			g := gateway{t, srv}
+			f.DiscoveryIssuer(c.issuer(f)) // a real IdP announces its own issuer
 
 			idp, _ := g.login(c.provider)
 			if idp == nil {
@@ -206,7 +207,6 @@ func TestVendorEndToEnd(t *testing.T) {
 				claims[k] = v
 			}
 			f.SetClaims(claims)
-			f.DiscoveryIssuer(c.issuer(f))
 
 			status, body := g.callback(c.provider, q.Get("state"))
 			if status != http.StatusOK {
