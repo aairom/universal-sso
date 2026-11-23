@@ -19,7 +19,7 @@ import (
 )
 
 // AccessToken is the access token every successful exchange returns.
-const AccessToken = "at-oauth2-1"
+const AccessToken = "at-oauth2-1" // nosecret: fixed fake-server test value
 
 // Fake is an in-process OAuth 2.0 server. Configure it before the code under
 // test runs. Fields that handlers read are guarded by the embedded mutex.

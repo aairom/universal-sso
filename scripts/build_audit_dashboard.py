@@ -105,11 +105,13 @@ def doc_changes(baseline: str) -> list[dict]:
         "Docs/Okta-SSO-Setup.md": "Status note, 404 row, security-control rows, planned-adapter wording",
         "Docs/Auth0-SSO-Setup.md": "Status note, 404 row, trailing-slash issuer, AUDIENCE and ROLES_CLAIM variables",
         "Docs/Azure-AD-SSO-Setup.md": "Status note, tenant pinning, ALLOWED_TENANTS and AUTHORITY variables",
-        "Docs/Architecture.md": "New 'OIDC vendor adapters' and 'Verification boundary' sections, diagram",
+        "Docs/Architecture.md": "New 'Generic OAuth 2.0', 'Generic SAML 2.0', 'OIDC vendor adapters' and 'Verification boundary' sections, diagram",
         "Docs/Google-SSO-Setup.md": "S4 no longer says Google is unregistered, hosted-domain restriction documented as implemented",
-        "Docs/Examples.md": "Rewrote 'Read this first', added 'End-to-end check'",
+        "Docs/Examples.md": "Rewrote 'Read this first', added 'End-to-end check', SAML Go-client-only note",
         "Docs/Quickstart.md": "Provider status table, scope paragraph, troubleshooting, next steps",
-        "README.md": "Status line, workflow diagram node, provider table, scope paragraph",
+        "README.md": "Status line, workflow diagram node, provider table, scope paragraph, License dependency note",
+        "Docs/SAML-SSO-Setup.md": "Status banner, .env block, security-control table (all implemented), error codes",
+        "Docs/OAuth2-SSO-Setup.md": "Status banner and variable names now implemented",
         ".env.example": "Okta sample id is now a placeholder, new optional variables documented",
         "Makefile": "Added test-e2e target",
     }
@@ -117,7 +119,7 @@ def doc_changes(baseline: str) -> list[dict]:
     for line in out.splitlines():
         a, d, path = line.split("\t")
         if path.startswith("examples/") and path.endswith("README.md"):
-            what = "'Read this first' banner replaced (adapter no longer planned)"
+            what = "'Read this first' banner replaced (all adapters implemented, fake-IdP tested)"
         else:
             what = notes.get(path, "")
         kind = "example README" if path.startswith("examples/") else ("config" if path in (".env.example", "Makefile") else "guide" if path.startswith("Docs/") else "readme")
@@ -153,11 +155,23 @@ def stale_docs() -> list[dict]:
         items.append({"sev": "outdated", "file": "Docs/Google-SSO-Setup.md", "line": ln,
                       "issue": "Says hosted-domain restriction is not implemented.",
                       "evidence": "pkg/sso/google/provider.go checkDomain enforces the hd claim; provider_test.go tests it", "action": "Document SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN as implemented"})
-    for name, f in (("SAML 2.0", "Docs/SAML-SSO-Setup.md"), ("Generic OAuth 2.0", "Docs/OAuth2-SSO-Setup.md")):
-        ln = find(f, r"planned, not yet implemented")
-        items.append({"sev": "accurate", "file": f, "line": ln or 5,
-                      "issue": f"{name} guide still says 'planned'. Correct: no adapter exists.",
-                      "evidence": "ssod registers mock, google, okta, auth0, azure only", "action": "Update when the adapter lands"})
+    for name, f, pkg in (("SAML 2.0", "Docs/SAML-SSO-Setup.md", "pkg/sso/saml"), ("Generic OAuth 2.0", "Docs/OAuth2-SSO-Setup.md", "pkg/sso/oauth2")):
+        ln = find(f, r"planned, not yet implemented|is \*\*planned")
+        if ln:
+            items.append({"sev": "outdated", "file": f, "line": ln,
+                          "issue": f"{name} guide still says 'planned', but the adapter exists.",
+                          "evidence": f"{pkg} is registered by cmd/ssod/vendors.go and tested", "action": "Reword the status banner"})
+        else:
+            items.append({"sev": "fixed", "file": f, "line": find(f, r"Project status") or 5,
+                          "issue": f"{name} guide describes the adapter as implemented and fake-IdP tested.",
+                          "evidence": f"{pkg} is registered by cmd/ssod/vendors.go and tested", "action": "None"})
+    # a doc may not call SAML or OAuth 2.0 planned, whichever file it is in
+    for f in ("README.md", "Docs/Quickstart.md", "Docs/Architecture.md", "Docs/Examples.md"):
+        ln = find(f, r"(?i)(saml|oauth 2\.0)[^|\n]{0,40}\b(planned|not yet implemented)")
+        if ln:
+            items.append({"sev": "outdated", "file": f, "line": ln,
+                          "issue": "Still calls the SAML 2.0 or OAuth 2.0 adapter planned.",
+                          "evidence": "pkg/sso/saml and pkg/sso/oauth2 are implemented", "action": "Reword"})
     return items
 
 
@@ -169,14 +183,14 @@ def open_items() -> list[dict]:
     rc, out, _ = sh("git status --porcelain")
     dirty = [l for l in out.splitlines() if l.strip()]
     items = [
-        {"prio": "high", "item": "Sign in against a live Okta, Auth0 and Entra tenant",
-         "why": "Adapters are verified against an in-process fake IdP only. Needs your tenant, credentials and a browser.",
+        {"prio": "high", "item": "Sign in against a live Okta, Auth0, Entra, OAuth 2.0 and SAML 2.0 IdP",
+         "why": "Adapters are verified against in-process fake IdPs only. Needs your tenant, credentials and a browser.",
          "owner": "you", "status": "open"},
         {"prio": "medium", "item": f"Build output is in git history ({hist} objects)",
          "why": "target/, bin/, obj/ were pushed earlier. The working tree no longer tracks them. Removal needs a history rewrite and force-push.",
          "owner": "you decide", "status": "open"},
-        {"prio": "medium", "item": "SAML 2.0 and generic OAuth 2.0 adapters",
-         "why": "Not implemented. The Go and Rust example clients default to these ids and report PROVIDER_NOT_FOUND.",
+        {"prio": "medium", "item": "SAML 2.0 scope limits",
+         "why": "Implemented and fake-IdP tested. Only the Go client completes a SAML sign-in (the others need OAuth state and PKCE). Not supported: encrypted assertions, IdP-initiated SSO, Single Logout, SHA-1.",
          "owner": "backlog", "status": "open"},
         {"prio": "low", "item": "Node.js example client",
          "why": "Only Rust, Go, Python, Java and C# exist.", "owner": "you decide", "status": "open"},
@@ -211,6 +225,7 @@ def excerpts() -> list[dict]:
         excerpt("pkg/sso/entra/provider.go", r"^\tswitch \{", 26, "Entra: tenant pinning for multi-tenant endpoints", note="For common, organizations and consumers, the issuer must equal <authority>/<tid>/v2.0 for the token's own tid."),
         excerpt("pkg/sso/oidc/provider.go", r"^func \(p \*Provider\) verifyIDToken", 36, "Shared base: ID token verification", note="RS256 only. Checks signature, issuer, audience, exp, nbf and subject. The nonce is checked in HandleCallback."),
         excerpt("pkg/sso/oidc/jwt.go", r"^func parseJWT", 36, "Shared base: algorithm allow-list", note="Rejects none, HS256 and every non-RS256 token before any key lookup."),
+        excerpt("pkg/sso/saml/response.go", r"^func \(p \*Provider\) verified\(", 30, "SAML: signature wrapping defence", lang="go", note="Verifies the signature against the metadata certificates and returns only the verified copy of the XML. SHA-1 is refused earlier."),
         excerpt("cmd/ssod/vendors.go", r"^func vendorEnv", 22, "Gateway: placeholder-aware vendor wiring", note="A fresh .env.example keeps all three vendors off. A client id without a secret is an error."),
     ]
 
@@ -520,7 +535,7 @@ def render(gates, cov, docs, stale, items, ex, env, schema, baseline) -> str:
 <div class="meta">Commit <code>{html.escape(head)}</code> on <code>{html.escape(branch)}</code> &middot; compared with <code>{html.escape(baseline)}</code> &middot; generated {html.escape(now)} by <code>scripts/build_audit_dashboard.py</code> &middot; {overall}</div></header>
 <main>
 <section id="summary"><h2>1. Summary</h2>
-<div class="notice"><b>Scope of verification.</b> The Okta, Auth0 and Microsoft Entra ID adapters were tested against an <b>in-process fake identity provider</b> (<code>pkg/sso/oidc/oidctest</code>), not against live tenant credentials. The unit tests and <code>tests/e2e.sh</code> prove that the adapters, the gateway and the five example clients work together over HTTP. They do <b>not</b> prove that a real Okta, Auth0 or Entra tenant accepts your configuration. A real sign-in needs your tenant, credentials and a browser, and follows the matching <code>Docs/*-SSO-Setup.md</code> guide.</div>
+<div class="notice"><b>Scope of verification.</b> The Okta, Auth0, Microsoft Entra ID, generic OAuth 2.0 and SAML 2.0 adapters were tested against an <b>in-process fake identity provider</b> (<code>oidctest</code>, <code>oauth2test</code>, <code>samltest</code>), not against live tenant credentials. The unit tests and <code>tests/e2e.sh</code> prove that the adapters, the gateway and the five example clients work together over HTTP. They do <b>not</b> prove that a real Okta, Auth0 or Entra tenant accepts your configuration. A real sign-in needs your tenant, credentials and a browser, and follows the matching <code>Docs/*-SSO-Setup.md</code> guide.</div>
 <div class="cards">
 <div class="card"><div class="n">{n_pass}/{len(gates)}</div><div class="l">validation gates passed</div></div>
 <div class="card"><div class="n">{len(docs)}</div><div class="l">documentation files changed</div></div>
@@ -528,7 +543,7 @@ def render(gates, cov, docs, stale, items, ex, env, schema, baseline) -> str:
 <div class="card"><div class="n">{n_out}</div><div class="l">outdated pages found</div></div>
 <div class="card"><div class="n">{n_open}</div><div class="l">open items</div></div>
 </div>
-<p>The Okta, Auth0 and Entra guides, README, Quickstart, Architecture, Examples and the five example READMEs now describe the adapters as implemented and fake-IdP tested. SAML 2.0 and generic OAuth 2.0 are still planned, and their guides say so correctly.</p></section>
+<p>The Okta, Auth0 and Entra guides, README, Quickstart, Architecture, Examples and the five example READMEs now describe the adapters as implemented and fake-IdP tested. The generic OAuth 2.0 and SAML 2.0 adapters are implemented too and their guides say so. Every adapter was verified against an in-process fake only. SAML works end to end with the Go client only.</p></section>
 
 <section id="matrix"><h2>2. Documentation status matrix</h2>
 <p class="mut">Changes since <code>{html.escape(baseline)}</code>, measured with <code>git diff --numstat</code>. Click a column header to sort.</p>

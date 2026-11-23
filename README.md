@@ -18,6 +18,10 @@ flowchart LR
     P3 --> G[(Google accounts)]
     R --> P2[okta / auth0 / entra adapters on pkg/sso/oidc]
     P2 --> I[(Okta, Auth0, Entra ID)]
+    R --> P4[oauth2.Provider generic OAuth 2.0]
+    P4 --> O[(OAuth 2.0 provider)]
+    R --> P5[saml.Provider SP-initiated, XML signature check]
+    P5 --> D[(SAML IdP)]
 ```
 
 ## Workflow

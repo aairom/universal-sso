@@ -61,6 +61,20 @@ class ExcerptTest(unittest.TestCase):
             b.excerpt("README.md", r"^THIS_DOES_NOT_EXIST$", 3, "x")
 
 
+class StaleDocsTest(unittest.TestCase):
+    def test_saml_and_oauth2_are_not_reported_planned(self):
+        items = b.stale_docs()
+        saml = [i for i in items if i["file"] == "Docs/SAML-SSO-Setup.md"]
+        self.assertTrue(saml)
+        self.assertTrue(all(i["sev"] == "fixed" for i in saml), saml)
+        self.assertFalse([i for i in items if i["sev"] == "outdated" and "planned" in i["issue"]])
+
+    def test_open_items_state_the_saml_limits(self):
+        text = " ".join(i["why"] for i in b.open_items())
+        self.assertIn("Only the Go client", text)
+        self.assertNotIn("Not implemented", text)
+
+
 class GateAndRenderTest(unittest.TestCase):
     def test_skip_gates_marks_not_run(self):
         gates = b.run_gates(True)
