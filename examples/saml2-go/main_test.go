@@ -18,7 +18,7 @@ func gw(t *testing.T) *httptest.Server {
 		http.Redirect(w, r, "/auth/mock/callback?state=s", http.StatusFound)
 	})
 	mux.HandleFunc("/auth/mock/callback", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"provider_id":"mock","user":{"id":"u","email":"a@b.test","display_name":"Mock User"}}`))
+		_, _ = w.Write([]byte(`{"provider_id":"mock","user":{"id":"u","email":"a@example.com","display_name":"Mock User"}}`))
 	})
 	mux.HandleFunc("/auth/saml/login", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(404)

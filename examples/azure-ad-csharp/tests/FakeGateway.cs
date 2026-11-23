@@ -25,7 +25,7 @@ internal sealed class FakeGateway : HttpMessageHandler
             "/providers" => Json(200, """{"providers":["mock","azure"]}"""),
             "/auth/mock/login" => Redirect("/mock/authorize?state=s1&code_challenge=c&code_challenge_method=S256"),
             "/mock/authorize" => Redirect("/auth/mock/callback?code=mock-code&state=s1"),
-            "/auth/mock/callback" => Json(200, """{"provider_id":"mock","user":{"id":"u1","email":"a@b.test","display_name":"Mock User"}}"""),
+            "/auth/mock/callback" => Json(200, """{"provider_id":"mock","user":{"id":"u1","email":"a@example.com","display_name":"Mock User"}}"""),
             "/auth/azure/login" => Redirect("https://login.example.test/authorize?state=s2&code_challenge=c&code_challenge_method=S256"),
             "/auth/missing/login" => Json(404, """{"code":"PROVIDER_NOT_FOUND","message":"missing"}"""),
             "/auth/weak/login" => Redirect("https://login.example.test/authorize?state=s3"),

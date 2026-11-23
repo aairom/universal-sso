@@ -18,7 +18,7 @@ public class GatewayClientTests
         Assert.Equal("s1", login.State);
         var p = await c.FollowLocalAsync(login);
         Assert.Equal("mock", p.ProviderId);
-        Assert.Equal("a@b.test", p.User.Email);
+        Assert.Equal("a@example.com", p.User.Email);
     }
 
     [Fact]

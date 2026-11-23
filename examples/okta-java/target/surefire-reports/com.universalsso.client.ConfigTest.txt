@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.universalsso.client.ConfigTest
--------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in com.universalsso.client.ConfigTest

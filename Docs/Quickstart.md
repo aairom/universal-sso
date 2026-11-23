@@ -172,5 +172,6 @@ scripts/github-push.sh        # interactive helper: sets the remote, commits, pu
 ## What next
 
 - [Architecture.md](Architecture.md): components, protocols, security model.
+- [Examples.md](Examples.md): command-line gateway clients in Rust, Go, Python, Java and C#.
 - Provider guides in the [status table](#provider-status).
 - Adapters for Entra ID, Okta, Auth0, SAML and generic OAuth 2.0 are the next planned work.

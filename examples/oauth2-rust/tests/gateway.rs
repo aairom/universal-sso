@@ -42,7 +42,7 @@ fn fake_gateway() -> String {
                 "/mock/authorize" => req.respond(redirect("/auth/mock/callback?code=mock-code&state=s1")),
                 "/auth/mock/callback" => req.respond(json(
                     200,
-                    r#"{"provider_id":"mock","user":{"id":"u1","email":"a@b.test","display_name":"Mock User"}}"#,
+                    r#"{"provider_id":"mock","user":{"id":"u1","email":"a@example.com","display_name":"Mock User"}}"#,
                 )),
                 "/auth/oauth2/login" => req.respond(redirect(
                     "https://idp.example.test/authorize?state=s2&code_challenge=c&code_challenge_method=S256",
@@ -73,7 +73,7 @@ fn mock_flow_completes_without_browser() {
     assert_eq!(login.state, "s1");
     let profile = c.follow_local(&login).unwrap();
     assert_eq!(profile.provider_id, "mock");
-    assert_eq!(profile.user.email, "a@b.test");
+    assert_eq!(profile.user.email, "a@example.com");
 }
 
 #[test]

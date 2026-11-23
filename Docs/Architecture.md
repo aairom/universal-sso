@@ -63,6 +63,8 @@ graph TD
 
 Setup guides: [Google](Google-SSO-Setup.md) (implemented), [Azure AD / Entra ID](Azure-AD-SSO-Setup.md), [Okta](Okta-SSO-Setup.md), [Auth0](Auth0-SSO-Setup.md), [Generic SAML 2.0](SAML-SSO-Setup.md) and [Generic OAuth 2.0](OAuth2-SSO-Setup.md) (all planned adapters).
 
+Example gateway clients (Rust, Go, Python, Java, C#) are described in [Examples.md](Examples.md).
+
 ---
 
 ## 3. Abstraction Layers and Interfaces

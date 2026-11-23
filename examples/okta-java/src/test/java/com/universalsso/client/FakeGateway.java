@@ -20,7 +20,7 @@ final class FakeGateway implements AutoCloseable {
         json(
                 "/auth/mock/callback",
                 200,
-                "{\"provider_id\":\"mock\",\"user\":{\"id\":\"u1\",\"email\":\"a@b.test\",\"display_name\":\"Mock User\"}}");
+                "{\"provider_id\":\"mock\",\"user\":{\"id\":\"u1\",\"email\":\"a@example.com\",\"display_name\":\"Mock User\"}}");
         redirect(
                 "/auth/okta/login",
                 "https://tenant.example.test/authorize?state=s2&code_challenge=c&code_challenge_method=S256");

@@ -33,7 +33,7 @@ class GatewayClientTest {
             assertEquals("s1", login.state());
             GatewayClient.Profile p = c.followLocal(login);
             assertEquals("mock", p.providerId());
-            assertEquals("a@b.test", p.user().email());
+            assertEquals("a@example.com", p.user().email());
         }
     }
 

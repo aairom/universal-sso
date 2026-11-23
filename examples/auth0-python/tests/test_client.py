@@ -25,7 +25,7 @@ class ClientTest(unittest.TestCase):
             self.assertEqual(login.state, "s1")
             profile = c.follow_local(login)
             self.assertEqual(profile.provider_id, "mock")
-            self.assertEqual(profile.user.email, "a@b.test")
+            self.assertEqual(profile.user.email, "a@example.com")
 
     def test_external_idp_needs_a_browser(self) -> None:
         with fake_gateway() as base:

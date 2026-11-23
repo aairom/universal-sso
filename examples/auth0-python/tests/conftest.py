@@ -31,7 +31,7 @@ class _Handler(BaseHTTPRequestHandler):
             "/auth/mock/login": lambda: self._send(302, location="/mock/authorize?state=s1&code_challenge=c&code_challenge_method=S256"),
             "/mock/authorize": lambda: self._send(302, location="/auth/mock/callback?code=mock-code&state=s1"),
             "/auth/mock/callback": lambda: self._send(
-                200, '{"provider_id":"mock","user":{"id":"u1","email":"a@b.test","display_name":"Mock User"}}'
+                200, '{"provider_id":"mock","user":{"id":"u1","email":"a@example.com","display_name":"Mock User"}}'
             ),
             "/auth/auth0/login": lambda: self._send(
                 302, location="https://tenant.example.test/authorize?state=s2&code_challenge=c&code_challenge_method=S256"

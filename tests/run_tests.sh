@@ -9,8 +9,11 @@ ROOT="$PWD"
 RC=0
 SKIPPED=()
 
-# A project-local .NET SDK (see Docs/Examples.md) is used when dotnet is not on PATH.
-[ -x "$ROOT/_dotnet/sdk/dotnet" ] && ! command -v dotnet >/dev/null 2>&1 && export PATH="$ROOT/_dotnet/sdk:$PATH"
+# A per-user .NET SDK outside the repository (see Docs/Examples.md) is used when dotnet is not on PATH.
+DOTNET_LOCAL="${DOTNET_LOCAL:-$HOME/.local/share/dotnet-universal-sso}"
+if ! command -v dotnet >/dev/null 2>&1 && [ -x "$DOTNET_LOCAL/dotnet" ]; then
+  export DOTNET_ROOT="$DOTNET_LOCAL" PATH="$DOTNET_LOCAL:$PATH"
+fi
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 
 suite() { # name, required tool, directory, command...

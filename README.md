@@ -65,6 +65,10 @@ make google-exchange CODE='<full redirected URL>'   # exchange the code and chec
 
 Full walkthrough and troubleshooting: [Docs/Google-SSO-Setup.md](Docs/Google-SSO-Setup.md).
 
+### Example clients (Rust, Go, Python, Java, C#)
+
+`examples/` holds five command-line clients for the gateway: generic OAuth 2.0 in Rust, SAML 2.0 in Go, Auth0 in Python, Okta in Java and Azure AD / Entra ID in C#. They are clients of `ssod`: the gateway keeps the secrets and tokens. Their providers are still planned in the gateway, so they report `PROVIDER_NOT_FOUND` today and complete a full sign-in with `SSO_PROVIDER=mock`. Details, limits and test instructions: [Docs/Examples.md](Docs/Examples.md). Run every suite with `make test-examples`.
+
 ### Provider setup guides
 
 Each guide follows the same structure: quick-start, how the pieces fit, provider-side setup, configuration values, verification with `curl`/`python3`, security, and troubleshooting.
