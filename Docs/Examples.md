@@ -40,6 +40,8 @@ Three scripts in `scripts/` automate the sequence that `make google-check` and `
 | `scripts/run-example.sh <example> [--mode M] [--provider ID]` | Preflight the toolchain, build `ssod` and the client, start a gateway, confirm the provider is registered, run `check` and `login`. | `make run-example EX=python` |
 | `scripts/sso-common.sh` | Shared helpers (`.env` reader, placeholder rules). Sourced, not run. | by the two above |
 
+The full design (architecture, per-mode sequence diagrams, execution flowchart, the 63 script checks, Makefile and lifecycle integration, prerequisites and launch scenarios) is in [`Launcher-Implementation.html`](Launcher-Implementation.html).
+
 Modes of `run-example.sh`:
 
 | Mode | Gateway | Credentials | What it proves |
