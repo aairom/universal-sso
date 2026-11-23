@@ -6,19 +6,25 @@ Five self-contained command-line clients for the Universal SSO gateway (`ssod`),
 
 These examples are **clients of the gateway**. They do not implement OAuth, OIDC or SAML themselves, and they hold no client ids, secrets or tokens. The gateway owns the signed state, PKCE verifier, nonce, client secret and tokens.
 
-The gateway currently implements the `mock` and `google` providers only. The Okta, Auth0, Azure AD, SAML 2.0 and generic OAuth 2.0 adapters are **planned**. So today:
+The gateway implements `mock`, `google`, and (when configured) `okta`, `auth0` and `azure` (Microsoft Entra ID). The SAML 2.0 and generic OAuth 2.0 adapters are **planned**.
 
-| Example | Default provider | Against today's `ssod` |
+Every client works with every implemented provider. Pick one with `SSO_PROVIDER`:
+
+| Example | Default provider | Other providers |
 |---|---|---|
-| [`examples/oauth2-rust`](../examples/oauth2-rust/README.md) | `oauth2` | `404 PROVIDER_NOT_FOUND`, reported clearly |
+| [`examples/oauth2-rust`](../examples/oauth2-rust/README.md) | `oauth2` | any of `mock`, `okta`, `auth0`, `azure`, `google` |
 | [`examples/saml2-go`](../examples/saml2-go/README.md) | `saml` | same |
 | [`examples/auth0-python`](../examples/auth0-python/README.md) | `auth0` | same |
 | [`examples/okta-java`](../examples/okta-java/README.md) | `okta` | same |
 | [`examples/azure-ad-csharp`](../examples/azure-ad-csharp/README.md) | `azure` | same |
 
-With `SSO_PROVIDER=mock` every example completes a full sign-in without a browser, which is what the live runs and the tests exercise. Once an adapter lands in the gateway, the matching client works unchanged. Real-provider runs additionally need a sandbox tenant and credentials, which are not included. Each example's README links the matching setup guide.
+The default of a client is the provider it is named after. For `oauth2` and `saml` there is no gateway adapter yet, so those two defaults answer `404 PROVIDER_NOT_FOUND`, which the client reports clearly. Set `SSO_PROVIDER` to an implemented provider to use them today.
 
-Token refresh, session cookies and protected-resource calls are **not** implemented. The gateway has no such endpoints (its callback returns the user profile and never echoes tokens), and a client-side imitation would be misleading.
+## End-to-end check
+
+`bash tests/e2e.sh` builds the gateway with `-tags e2e`, which mounts in-process **fake** OIDC servers (`pkg/sso/oidc/oidctest`) for Okta, Auth0 and Entra on the gateway's own port. It then runs all five clients against `okta`, `auth0`, `azure` and `mock` (20 sign-ins, each must print `signed in via <provider>`) plus four negative checks (forged state, missing state, unknown provider, a code the IdP never issued). A missing toolchain is a failure, not a skip, unless `E2E_ALLOW_SKIP=1`.
+
+What this proves: the adapters, the gateway and the five clients work together over HTTP, including authorization code with PKCE, token exchange, ID token verification and nonce. **What it does not prove:** that a real Okta, Auth0 or Entra tenant accepts your configuration. The fake approves every request and never asks a person to sign in. A real sign-in needs your tenant, your credentials and a browser, and follows the matching `Docs/*-SSO-Setup.md` guide. The `-tags e2e` binary is for tests only and must never be deployed.
 
 ## What each client does
 
@@ -81,5 +87,5 @@ Last verified results: Go 87.6% coverage on the client package, Rust 11 tests wi
 make start                                   # repository root
 cd examples/auth0-python && cp .env.example .env
 SSO_PROVIDER=mock make login-mock            # prints: signed in via mock as Mock User
-make login                                   # 404 PROVIDER_NOT_FOUND until the adapter exists
+make login                                   # real provider: open the printed URL in a browser
 ```

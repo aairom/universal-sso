@@ -2,7 +2,7 @@
 
 Step-by-step instructions for configuring **Auth0's side** of the SSO integration (tenant, Regular Web Application, connections, callback URLs) and wiring the resulting values into Universal SSO.
 
-> **Project status.** The Auth0 provider is **planned, not yet implemented**. `pkg/sso` has the generic provider interface, driver registry, state and PKCE handling that an `auth0` driver will plug into, and `.env.example` already reserves the `SSO_PROVIDERS_AUTH0_*` variables. Until the adapter exists, `ssod` does not register `auth0` and `/auth/auth0/login` answers `404 PROVIDER_NOT_FOUND`. Everything on **Auth0's side** (sections 1 to 3 and the manual checks in section 5) works today and is worth finishing first: it proves your tenant, application and secret are correct independently of any code. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` instead.
+> **Project status.** The Auth0 provider is **implemented** (`pkg/sso/auth0`, built on the generic OIDC provider in `pkg/sso/oidc`) and `ssod` registers it as `auth0` once `SSO_PROVIDERS_AUTH0_CLIENT_ID` and `SSO_PROVIDERS_AUTH0_CLIENT_SECRET` are set to real values. It is verified against an in-process **fake** OIDC server (`bash tests/e2e.sh`, unit tests), **not against a live Auth0 tenant**: that needs your tenant and a browser, which is what section 5.6 is for. Everything on **Auth0's side** (sections 1 to 3 and the manual checks in section 5) is worth finishing first, because it proves your tenant, client and secret are correct independently of any code. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` instead.
 
 Auth0's dashboard and documentation change over time. This guide follows the current **Auth0 Dashboard** layout (Applications, Authentication, Monitoring). If a label differs in your dashboard, use the linked Auth0 pages as the source of truth.
 
@@ -26,7 +26,7 @@ Auth0's dashboard and documentation change over time. This guide follows the cur
 
 | # | Symptom | Cause | Go to |
 |---|---|---|---|
-| 1 | `/auth/auth0/login` returns 404 | The `auth0` adapter is not implemented yet, so the provider is never registered | [7.7](#77-errors-returned-by-this-project) |
+| 1 | `/auth/auth0/login` returns 404 | The provider is not registered: its client id is empty or still the `.env.example` sample, or `ssod` was not restarted | [7.7](#77-errors-returned-by-this-project) |
 | 2 | "Callback URL mismatch" | The URL in **Allowed Callback URLs** differs from the one sent by one character | [7.1](#71-callback-url-mismatch) |
 | 3 | The issuer check fails by one character | Auth0's issuer **ends with a slash**: `https://<tenant>.auth0.com/` | [S2 below](#s2-domain-and-issuer-url) |
 | 4 | `Grant type 'authorization_code' not allowed for the client` or `invalid_client` | The application type is wrong (for example *Single Page Application*), or the grant is off | [7.2](#72-invalid_client-and-grant-type-not-allowed) |
@@ -57,7 +57,7 @@ curl -s "https://$DOMAIN/.well-known/openid-configuration" \
 #    exchange it with the curl command in section 5.3.
 ```
 
-A successful token exchange (section 5.3) means everything on Auth0's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs the planned `auth0` adapter.
+A successful token exchange (section 5.3) means everything on Auth0's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs the `auth0` provider enabled in `.env` (see section 6).
 
 ### S1. Dashboard navigation
 
@@ -102,7 +102,7 @@ The secret is hidden behind an eye icon on the **Settings** tab. Unlike some pro
 
 ### S4. The browser shows "This site can't be reached" after sign-in
 
-This is expected when `ssod` is not handling `/auth/auth0/callback` (and today it is not, because the adapter is planned): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
+This is expected when `ssod` is not handling `/auth/auth0/callback` (for example `ssod` is not running, or the provider is not enabled): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
 
 ### S5. Connections and test users
 
@@ -202,7 +202,7 @@ Open the **Credentials** tab and check **Authentication Method**:
 | **Private Key JWT** | Stronger option for production. A possible later extension |
 | **None** | For public clients only. Do not use here |
 
-The planned adapter will use `Client Secret (Post)` or `Basic`, so either works. The manual check in 5.3 uses the body form.
+The adapter sends the secret in the request body (`Client Secret (Post)`), and the `basic` method is supported by the code as well, so either Auth0 setting works. The manual check in 5.3 uses the body form.
 
 ### 2.5 Enable a connection
 
@@ -308,13 +308,16 @@ SSO_PROVIDERS_AUTH0_CLIENT_ID=<your-client-id>
 SSO_PROVIDERS_AUTH0_CLIENT_SECRET=<your-client-secret>
 SSO_PROVIDERS_AUTH0_ISSUER_URL=https://<your-tenant>.<region>.auth0.com/
 SSO_PROVIDERS_AUTH0_REDIRECT_URL=http://localhost:8080/auth/auth0/callback
+# Optional: API identifier (audience parameter) and the claim that carries roles
+# SSO_PROVIDERS_AUTH0_AUDIENCE=<api-identifier>
+# SSO_PROVIDERS_AUTH0_ROLES_CLAIM=<namespaced-roles-claim>
 ```
 
 Rules for this file:
 
 - `scripts/start.sh` loads it with the shell, so use only `KEY=VALUE` lines. Quote any value that contains spaces or shell characters.
 - `SSO_PROVIDERS_AUTH0_REDIRECT_URL` must equal one of the URLs registered in section 3.2 character for character, and equal `SSO_SERVER_BASE_URL` plus `/auth/auth0/callback`.
-- `SSO_PROVIDERS_AUTH0_ISSUER_URL` **keeps its trailing slash**. It must match the `issuer` in the discovery document exactly.
+- `SSO_PROVIDERS_AUTH0_ISSUER_URL` should keep its trailing slash and must match the `issuer` in the discovery document. The adapter appends the slash when it is missing.
 - `.env` is already git-ignored. `.env.example` is the only variant that is committed, and it must contain placeholders only.
 
 ### 4.4 How the values are used
@@ -505,8 +508,8 @@ Inject the values as environment variables at deploy time instead of shipping a 
 | Signed, expiring, single-use `state` (CSRF protection) | Implemented |
 | PKCE with `S256` | Implemented in the manager and mock provider. Auth0 supports it for Regular Web Applications |
 | Callback URL exact match | Enforced by Auth0. Keep the list minimal and avoid wildcards |
-| ID token validation (`iss`, `aud`, `exp`, signature, `nonce`) | Planned in the `auth0` adapter (RS256, keys from the tenant's JWKS) |
-| Issuer check with trailing slash | Planned. Never accept a token from another tenant |
+| ID token validation (`iss`, `aud`, `exp`, signature, `nonce`) | Implemented (RS256 only, keys from the tenant's JWKS, rotation-aware). `none` and HS256 are rejected |
+| Issuer check with trailing slash | Implemented. The trailing slash is added when missing, and a slashless `iss` is rejected |
 | HTTPS in every non-local environment | Required for non-localhost callback URLs |
 | Do not echo tokens to the browser | The reference server returns the profile only |
 
@@ -610,7 +613,7 @@ Auth0 shows "Callback URL mismatch. The provided redirect_uri is not in the list
 | `STATE_MISMATCH` | 400 | Forged, replayed, or already-used `state`, or state issued for a different provider. Restart login |
 | `STATE_EXPIRED` | 400 | The signed state exceeded its lifetime (10 minutes by default). Restart login |
 | `IDP_REJECTED` | 401 | Auth0 returned an `error` parameter, for example `access_denied` when the user cancelled or an Action denied the login |
-| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. **Today this is always the result for `auth0`**, because the adapter is not implemented. Once it exists, the provider is registered only when its Client ID and secret are set in `.env` |
+| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. `auth0` is registered only when its Client ID and secret are set in `.env` |
 | `INVALID_CONFIG` | 500 | Startup problem, such as `SSO_STATE_SECRET` shorter than 32 bytes |
 | `NETWORK_FAILURE` | 502 | `ssod` could not reach Auth0 (discovery, JWKS or token endpoint) or got an unexpected reply. Check connectivity and proxy settings. Auth0 also answers `429` when you exceed rate limits (see the `X-RateLimit-*` headers) |
 | `SIGNATURE_INVALID` / `INVALID_TOKEN` / `TOKEN_EXPIRED` | 401 | The ID token failed verification (signature, issuer, audience, expiry). Check that the Client ID and issuer in `.env` match the token, and that the system clock is correct |

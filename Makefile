@@ -1,4 +1,4 @@
-.PHONY: build test test-examples start stop restart clean google-check google-url google-exchange
+.PHONY: build test test-examples test-e2e start stop restart clean google-check google-url google-exchange
 
 build:
 	go build -o .run/ssod ./cmd/ssod
@@ -9,6 +9,9 @@ test:
 # Root tests plus every example's own suite (see Docs/Examples.md).
 test-examples:
 	bash tests/run_tests.sh
+
+test-e2e:
+	bash tests/e2e.sh
 
 start:
 	scripts/start.sh

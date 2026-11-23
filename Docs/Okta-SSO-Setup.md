@@ -2,7 +2,7 @@
 
 Step-by-step instructions for configuring **Okta's side** of the SSO integration (OIDC app integration, authorization server, redirect URIs, user assignment) and wiring the resulting values into Universal SSO.
 
-> **Project status.** The Okta provider is **planned, not yet implemented**. `pkg/sso` has the generic provider interface, driver registry, state and PKCE handling that an `okta` driver will plug into, and `.env.example` already reserves the `SSO_PROVIDERS_OKTA_*` variables. Until the adapter exists, `ssod` does not register `okta` and `/auth/okta/login` answers `404 PROVIDER_NOT_FOUND`. Everything on **Okta's side** (sections 1 to 3 and the manual checks in section 5) works today and is worth finishing first: it proves your org, client and secret are correct independently of any code. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` instead.
+> **Project status.** The Okta provider is **implemented** (`pkg/sso/okta`, built on the generic OIDC provider in `pkg/sso/oidc`) and `ssod` registers it as `okta` once `SSO_PROVIDERS_OKTA_CLIENT_ID` and `SSO_PROVIDERS_OKTA_CLIENT_SECRET` are set to real values. It is verified against an in-process **fake** OIDC server (`bash tests/e2e.sh`, unit tests), **not against a live Okta tenant**: that needs your tenant and a browser, which is what section 5.6 is for. Everything on **Okta's side** (sections 1 to 3 and the manual checks in section 5) is worth finishing first, because it proves your tenant, client and secret are correct independently of any code. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` instead.
 
 Okta's Admin Console and documentation change over time. This guide follows the current **Okta Integrator Free Plan / Okta Identity Engine** layout (Applications, Security, Reports). If a label differs in your console, use the linked Okta pages as the source of truth.
 
@@ -26,7 +26,7 @@ Okta's Admin Console and documentation change over time. This guide follows the 
 
 | # | Symptom | Cause | Go to |
 |---|---|---|---|
-| 1 | `/auth/okta/login` returns 404 | The `okta` adapter is not implemented yet, so the provider is never registered | [7.7](#77-errors-returned-by-this-project) |
+| 1 | `/auth/okta/login` returns 404 | The provider is not registered: its client id is empty or still the `.env.example` sample, or `ssod` was not restarted | [7.7](#77-errors-returned-by-this-project) |
 | 2 | "Which URL is my Okta domain?" | The Admin Console URL ends in `-admin.okta.com`. The org URL does not | [S2 below](#s2-okta-domain-and-issuer-url) |
 | 3 | "Which issuer URL do I use?" | Org authorization server (`https://<domain>`) versus custom/default server (`https://<domain>/oauth2/default`) | [S3 below](#s3-which-authorization-server), [2.3](#23-choose-the-authorization-server) |
 | 4 | "I never saw the client secret" | It is on the app's **General** tab, not in the wizard | [3.1](#31-find-the-client-id-and-client-secret) |
@@ -57,7 +57,7 @@ curl -s "$ISSUER/.well-known/openid-configuration" \
 #    exchange it with the curl command in section 5.3.
 ```
 
-A successful token exchange (section 5.3) means everything on Okta's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs the planned `okta` adapter.
+A successful token exchange (section 5.3) means everything on Okta's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs the `okta` provider enabled in `.env` (see section 6).
 
 ### S1. Console navigation
 
@@ -109,7 +109,7 @@ Every Okta org has an **org authorization server**. Orgs with API Access Managem
 
 ### S4. The browser shows "This site can't be reached" after sign-in
 
-This is expected when `ssod` is not handling `/auth/okta/callback` (and today it is not, because the adapter is planned): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
+This is expected when `ssod` is not handling `/auth/okta/callback` (for example `ssod` is not running, or the provider is not enabled): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
 
 ### S5. User not assigned and "access_denied"
 
@@ -198,7 +198,7 @@ On your app > **General** tab > **Client Credentials** > **Edit**:
 
 | Setting | Value | Reason |
 |---|---|---|
-| Client authentication | **Client secret** | A server-side confidential client. The planned adapter will start with this method |
+| Client authentication | **Client secret** | A server-side confidential client. The adapter uses this method |
 | Proof Key for Code Exchange (PKCE) | **Require PKCE as additional verification** (recommended) | PKCE is optional for confidential clients but this project always sends it. Requiring it blocks code interception |
 
 Okta also supports **Public key / Private key** (`private_key_jwt`) authentication. It is a stronger option for production and a possible later extension.
@@ -321,7 +321,7 @@ Rules for this file:
 
 - `scripts/start.sh` loads it with the shell, so use only `KEY=VALUE` lines. Quote any value that contains spaces or shell characters.
 - `SSO_PROVIDERS_OKTA_REDIRECT_URL` must equal one of the URIs registered in section 3.2 character for character, and equal `SSO_SERVER_BASE_URL` plus `/auth/okta/callback`.
-- `SSO_PROVIDERS_OKTA_ISSUER_URL` must match the `issuer` in the discovery document exactly. No trailing slash.
+- `SSO_PROVIDERS_OKTA_ISSUER_URL` must match the `issuer` in the discovery document exactly. No trailing slash needed: a single trailing slash is ignored.
 - `.env` is already git-ignored. `.env.example` is the only variant that is committed, and it must contain placeholders only.
 
 ### 4.4 How the values are used
@@ -510,8 +510,8 @@ Inject the values as environment variables at deploy time instead of shipping a 
 | Signed, expiring, single-use `state` (CSRF protection) | Implemented |
 | PKCE with `S256` | Implemented in the manager and mock provider. Okta supports it, and you can require it per app (2.4) |
 | Redirect URI exact match | Enforced by Okta. Keep the list minimal and avoid wildcards |
-| ID token validation (`iss`, `aud`, `exp`, signature, `nonce`) | Planned in the `okta` adapter (RS256, keys from the server's JWKS) |
-| Issuer check against `SSO_PROVIDERS_OKTA_ISSUER_URL` | Planned. Never accept a token from another org or authorization server |
+| ID token validation (`iss`, `aud`, `exp`, signature, `nonce`) | Implemented (RS256 only, keys from the server's JWKS, rotation-aware). `none` and HS256 are rejected |
+| Issuer check against `SSO_PROVIDERS_OKTA_ISSUER_URL` | Implemented. A token from another org or authorization server is rejected |
 | HTTPS in every non-local environment | Required for non-localhost redirect URIs |
 | Do not echo tokens to the browser | The reference server returns the profile only |
 
@@ -565,7 +565,7 @@ The Client ID or client secret is wrong, or the client authenticated with a meth
 
 - Re-copy both values. Look for trailing spaces or smart quotes.
 - Confirm the Client ID and secret belong to the **same** app, and that the issuer belongs to the **same** org.
-- Confirm **Client authentication** on the app is **Client secret**, and that the token request authenticates with HTTP Basic or with `client_id` and `client_secret` in the body (the planned adapter will use HTTP Basic).
+- Confirm **Client authentication** on the app is **Client secret**, and that the token request authenticates with HTTP Basic or with `client_id` and `client_secret` in the body (the adapter sends them in the body by default).
 - If `.env` values contain special characters, quote them. `scripts/start.sh` sources the file in a shell.
 - If the secret was deactivated, add a new one (section 3.1).
 
@@ -613,7 +613,7 @@ The Client ID or client secret is wrong, or the client authenticated with a meth
 | `STATE_MISMATCH` | 400 | Forged, replayed, or already-used `state`, or state issued for a different provider. Restart login |
 | `STATE_EXPIRED` | 400 | The signed state exceeded its lifetime (10 minutes by default). Restart login |
 | `IDP_REJECTED` | 401 | Okta returned an `error` parameter, for example `access_denied` when the user clicked Cancel |
-| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. **Today this is always the result for `okta`**, because the adapter is not implemented. Once it exists, the provider is registered only when its Client ID and secret are set in `.env` |
+| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. `okta` is registered only when its Client ID and secret are set in `.env` |
 | `INVALID_CONFIG` | 500 | Startup problem, such as `SSO_STATE_SECRET` shorter than 32 bytes |
 | `NETWORK_FAILURE` | 502 | `ssod` could not reach Okta (discovery, JWKS or token endpoint) or got an unexpected reply. Check connectivity and proxy settings. Okta also answers `429` when you exceed rate limits (see `X-Rate-Limit-*` headers) |
 | `SIGNATURE_INVALID` / `INVALID_TOKEN` / `TOKEN_EXPIRED` | 401 | The ID token failed verification (signature, issuer, audience, expiry). Check that the Client ID and issuer in `.env` match the token, and that the system clock is correct |

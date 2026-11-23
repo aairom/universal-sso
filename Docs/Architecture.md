@@ -61,7 +61,34 @@ graph TD
 | **Generic OAuth 2.0** | OAuth 2.0 (RFC 6749) | Authorization Code / Client Credentials | Standard token endpoint, custom header auth, basic auth |
 | **Mock Provider** | In-Memory Simulation | Synthetic Auth Flow | Full cryptographic simulation for CI/CD and offline testing |
 
-Setup guides: [Google](Google-SSO-Setup.md) (implemented), [Azure AD / Entra ID](Azure-AD-SSO-Setup.md), [Okta](Okta-SSO-Setup.md), [Auth0](Auth0-SSO-Setup.md), [Generic SAML 2.0](SAML-SSO-Setup.md) and [Generic OAuth 2.0](OAuth2-SSO-Setup.md) (all planned adapters).
+Setup guides: [Google](Google-SSO-Setup.md), [Azure AD / Entra ID](Azure-AD-SSO-Setup.md), [Okta](Okta-SSO-Setup.md) and [Auth0](Auth0-SSO-Setup.md) are implemented. [Generic SAML 2.0](SAML-SSO-Setup.md) and [Generic OAuth 2.0](OAuth2-SSO-Setup.md) are planned adapters.
+
+### OIDC vendor adapters
+
+Okta, Auth0 and Entra ID are thin wrappers over one generic OIDC provider, `pkg/sso/oidc`. The base owns discovery, JWKS caching and rotation, the authorization code flow with PKCE (S256), token exchange, and ID token verification. A wrapper only supplies vendor rules through hooks.
+
+```mermaid
+graph LR
+    Okta[pkg/sso/okta] --> Base[pkg/sso/oidc]
+    Auth0[pkg/sso/auth0] --> Base
+    Entra[pkg/sso/entra] --> Base
+    Base --> Disc[Discovery + JWKS cache]
+    Base --> Ver[RS256 verify, iss, aud, exp, nbf, nonce]
+    Base --> Tok[Token, refresh, revoke, userinfo, logout]
+    Google[pkg/sso/google] -.standalone, not on the base.-> Disc
+```
+
+| Vendor | Gateway id | What the wrapper adds |
+|---|---|---|
+| Okta | `okta` | `groups` and `preferred_username` claims; org or custom authorization server issuer |
+| Auth0 | `auth0` | trailing-slash issuer, `audience` parameter, roles claim, `/v2/logout` URL |
+| Entra ID | `azure` | tenant pinning, `tid` based issuer check for multi-tenant endpoints, `AllowedTenants`, `roles` and `groups` |
+
+Security properties, each covered by a unit test: only RS256 is accepted (`none`, HS256 and other algorithms are rejected before key lookup), the nonce is bound to the login, the PKCE verifier is required, the discovery issuer must equal the configured issuer, an unknown `kid` triggers at most one JWKS refresh per minute, and responses are capped at 1 MiB.
+
+### Verification boundary
+
+`pkg/sso/oidc/oidctest` is an in-process fake OIDC server. The unit tests and `tests/e2e.sh` (the gateway built with `-tags e2e`, all five example clients, four providers) run against it. That proves the code, not a live tenant. See [Examples.md](Examples.md#end-to-end-check).
 
 Example gateway clients (Rust, Go, Python, Java, C#) are described in [Examples.md](Examples.md).
 

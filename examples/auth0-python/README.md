@@ -2,7 +2,7 @@
 
 A Python client for the Universal SSO gateway (`ssod`). It starts a sign-in for the `auth0` provider with an Auth0 tenant, checks the redirect the gateway returns, and (for the mock provider) completes the sign-in without a browser.
 
-> **Read this first.** The gateway in this repository implements the `mock` and `google` providers only. The `auth0` adapter is **planned**, so against today's `ssod` this example gets `404 PROVIDER_NOT_FOUND`, and prints a clear message. The full flow runs today with `SSO_PROVIDER=mock`. Once the `auth0` adapter exists in the gateway, this client works unchanged. See [Provider status](../../Docs/Quickstart.md#provider-status).
+> **Read this first.** This client talks to the gateway in this repository. The gateway implements `mock`, `google`, `okta`, `auth0` and `azure`. SAML 2.0 and generic OAuth 2.0 are planned, so `SSO_PROVIDER=saml` and `SSO_PROVIDER=oauth2` answer `404 PROVIDER_NOT_FOUND`, which this client reports clearly. Okta, Auth0 and Azure are tested against an in-process fake IdP (`bash tests/e2e.sh` in the repository root), not against live tenants. The full flow runs without a browser with `make login-mock` or `bash tests/e2e.sh`. See [Provider status](../../Docs/Quickstart.md#provider-status).
 
 ## What this client does, and does not do
 

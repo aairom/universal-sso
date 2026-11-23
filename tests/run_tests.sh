@@ -32,6 +32,14 @@ suite "examples/auth0-python"   python3 "$ROOT/examples/auth0-python"   env PYTH
 suite "examples/okta-java"      mvn    "$ROOT/examples/okta-java"       mvn -q -B test
 suite "examples/azure-ad-csharp" dotnet "$ROOT/examples/azure-ad-csharp/tests" dotnet test --nologo
 
+# Every example client signs in through every vendor adapter (fake IdPs, see tests/e2e.sh).
+echo "== e2e (5 clients x okta/auth0/azure/mock)"
+if [ "${REQUIRE_ALL:-0}" = 1 ]; then
+  bash "$ROOT/tests/e2e.sh" || { echo "FAIL: e2e"; RC=1; }
+else
+  E2E_ALLOW_SKIP=1 bash "$ROOT/tests/e2e.sh" || { echo "FAIL: e2e"; RC=1; }
+fi
+
 if [ "${#SKIPPED[@]}" -gt 0 ]; then
   echo "SKIPPED suites: ${SKIPPED[*]}"
   [ "${REQUIRE_ALL:-0}" = 1 ] && RC=1

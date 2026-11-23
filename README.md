@@ -2,7 +2,7 @@
 
 A modular Go SDK that gives applications one `Provider` abstraction over OIDC, OAuth 2.0 and SAML 2.0 identity providers. The core ships signed state (HMAC), mandatory PKCE (S256), one-time-use login state, a pluggable cache, a driver registry and an in-memory mock provider for tests.
 
-**Status:** core, `Manager`, registry, mock provider and the **Google OIDC provider** (`pkg/sso/google`) are implemented. Okta, Auth0, Azure AD, SAML 2.0 and generic OAuth 2.0 adapters are still to do; see [Docs/Architecture.md](Docs/Architecture.md).
+**Status:** core, `Manager`, registry, mock provider and the **Google OIDC provider** (`pkg/sso/google`) are implemented. The **Okta, Auth0 and Microsoft Entra ID OIDC adapters** (`pkg/sso/okta`, `auth0`, `entra`, on the shared `pkg/sso/oidc`) are implemented and tested against a fake IdP, not yet against live tenants. SAML 2.0 and generic OAuth 2.0 adapters are planned; see [Docs/Architecture.md](Docs/Architecture.md).
 
 ## Architecture
 
@@ -16,7 +16,8 @@ flowchart LR
     R --> P1[mock.Provider]
     R --> P3[google.Provider OIDC + PKCE + JWKS]
     P3 --> G[(Google accounts)]
-    R -.planned.-> P2[Okta / Auth0 / Azure AD / SAML adapters]
+    R --> P2[okta / auth0 / entra adapters on pkg/sso/oidc]
+    P2 --> I[(Okta, Auth0, Entra ID)]
 ```
 
 ## Workflow
@@ -76,13 +77,13 @@ Each guide follows the same structure: quick-start, how the pieces fit, provider
 | Provider | Guide | Adapter status |
 |---|---|---|
 | Google | [Docs/Google-SSO-Setup.md](Docs/Google-SSO-Setup.md) | Implemented (`pkg/sso/google`) |
-| Azure AD / Microsoft Entra ID | [Docs/Azure-AD-SSO-Setup.md](Docs/Azure-AD-SSO-Setup.md) | Planned |
-| Okta | [Docs/Okta-SSO-Setup.md](Docs/Okta-SSO-Setup.md) | Planned |
-| Auth0 | [Docs/Auth0-SSO-Setup.md](Docs/Auth0-SSO-Setup.md) | Planned |
+| Azure AD / Microsoft Entra ID | [Docs/Azure-AD-SSO-Setup.md](Docs/Azure-AD-SSO-Setup.md) | Implemented (fake-IdP tested) |
+| Okta | [Docs/Okta-SSO-Setup.md](Docs/Okta-SSO-Setup.md) | Implemented (fake-IdP tested) |
+| Auth0 | [Docs/Auth0-SSO-Setup.md](Docs/Auth0-SSO-Setup.md) | Implemented (fake-IdP tested) |
 | Generic SAML 2.0 | [Docs/SAML-SSO-Setup.md](Docs/SAML-SSO-Setup.md) | Planned |
 | Generic OAuth 2.0 | [Docs/OAuth2-SSO-Setup.md](Docs/OAuth2-SSO-Setup.md) | Planned |
 
-For the planned providers, the identity-provider side can be configured and verified today with the manual steps in each guide. `ssod` answers `404 PROVIDER_NOT_FOUND` for them until their adapters exist.
+Okta, Auth0 and Azure AD are verified against an in-process fake OIDC server only (`bash tests/e2e.sh` signs every example client in through each adapter). They have **not** been exercised against a live tenant. For SAML 2.0 and generic OAuth 2.0 (planned) the identity-provider side can be configured and verified with the manual steps in each guide, and `ssod` answers `404 PROVIDER_NOT_FOUND`.
 
 ## Lifecycle scripts
 

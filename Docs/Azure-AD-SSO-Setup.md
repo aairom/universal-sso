@@ -2,7 +2,7 @@
 
 Step-by-step instructions for configuring **Microsoft Entra ID's side** of the SSO integration (app registration, client secret, redirect URIs, user assignment) and wiring the resulting values into Universal SSO. Azure Active Directory (Azure AD) was renamed Microsoft Entra ID. The two names refer to the same service, and error codes still use the `AADSTS` prefix.
 
-> **Project status.** The Azure provider is **planned, not yet implemented**. `pkg/sso` has the generic provider interface, driver registry, state and PKCE handling that an `azure` driver will plug into, and `.env.example` already reserves the `SSO_PROVIDERS_AZURE_*` variables. Until the adapter exists, `ssod` does not register `azure` and `/auth/azure/login` answers `404 PROVIDER_NOT_FOUND`. Everything on **Microsoft's side** (sections 1 to 3 and the manual checks in section 5) works today and is worth finishing first: it proves your tenant, client and secret are correct independently of any code. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` instead.
+> **Project status.** The Azure provider is **implemented** (`pkg/sso/entra`, built on the generic OIDC provider in `pkg/sso/oidc`) and `ssod` registers it as `azure` once `SSO_PROVIDERS_AZURE_CLIENT_ID` and `SSO_PROVIDERS_AZURE_CLIENT_SECRET` are set to real values. It is verified against an in-process **fake** OIDC server (`bash tests/e2e.sh`, unit tests), **not against a live Azure tenant**: that needs your tenant and a browser, which is what section 5.6 is for. Everything on **Microsoft's side** (sections 1 to 3 and the manual checks in section 5) is worth finishing first, because it proves your tenant, client and secret are correct independently of any code. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` instead.
 
 Microsoft's portal and documentation change over time. This guide follows the current **Microsoft Entra admin center** layout (Identity, Applications, App registrations). If a label differs in your portal, use the linked Microsoft pages as the source of truth.
 
@@ -26,7 +26,7 @@ Microsoft's portal and documentation change over time. This guide follows the cu
 
 | # | Symptom | Cause | Go to |
 |---|---|---|---|
-| 1 | `/auth/azure/login` returns 404 | The `azure` adapter is not implemented yet, so the provider is never registered | [Project status](#azure-ad--microsoft-entra-id-sso-setup-guide), [7.7](#77-errors-returned-by-this-project) |
+| 1 | `/auth/azure/login` returns 404 | The provider is not registered: its client id is empty or still the `.env.example` sample, or `ssod` was not restarted | [Project status](#azure-ad--microsoft-entra-id-sso-setup-guide), [7.7](#77-errors-returned-by-this-project) |
 | 2 | `AADSTS7000215: Invalid client secret provided` | The **Secret ID** (a GUID) was copied instead of the secret **Value** | [S2 below](#s2-secret-value-versus-secret-id), [7.2](#72-aadsts7000215-and-aadsts7000222-client-secret-problems) |
 | 3 | "I never saw the secret Value" | Entra shows it only once, right after creation | [3.1](#31-create-a-client-secret), [S3 below](#s3-no-client-secret-value) |
 | 4 | `AADSTS50011: The redirect URI ... does not match` | The URI registered in Entra differs from the one sent by one character | [7.1](#71-aadsts50011-redirect-uri-mismatch) |
@@ -57,7 +57,7 @@ curl -s "https://login.microsoftonline.com/$TENANT/v2.0/.well-known/openid-confi
 #    exchange it with the curl command in section 5.3.
 ```
 
-A successful token exchange (section 5.3) means everything on Microsoft's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs the planned `azure` adapter.
+A successful token exchange (section 5.3) means everything on Microsoft's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs the `azure` provider enabled in `.env` (see section 6).
 
 ### S1. Portal navigation
 
@@ -106,7 +106,7 @@ Microsoft shows the secret **Value** only once, at creation. If you closed the p
 
 ### S4. The browser shows "This site can't be reached" after sign-in
 
-This is expected when `ssod` is not handling `/auth/azure/callback` (and today it is not, because the adapter is planned): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
+This is expected when `ssod` is not handling `/auth/azure/callback` (for example `ssod` is not running, or the provider is not enabled): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
 
 ### S5. Tenant restrictions and "Need admin approval"
 
@@ -190,7 +190,7 @@ This choice decides who can sign in and which `{tenant}` value your URLs use. It
 | Multitenant and **personal Microsoft accounts** | Work, school, and personal accounts | `common` |
 | **Personal Microsoft accounts only** | Only personal accounts such as Outlook.com | `consumers` |
 
-Use **Single tenant** for company-internal SSO. It is the safest choice and the only one where the issuer in discovery is a fixed value. For `common` and `organizations`, the discovery document contains a literal `{tenantid}` placeholder in the issuer, so the server must validate the issuer against the `tid` claim of each token. The planned adapter will do this. Never accept an arbitrary issuer.
+Use **Single tenant** for company-internal SSO. It is the safest choice and the only one where the issuer in discovery is a fixed value. For `common` and `organizations`, the discovery document contains a literal `{tenantid}` placeholder in the issuer, so the server must validate the issuer against the `tid` claim of each token. The adapter does this: the issuer must equal `https://login.microsoftonline.com/<tid>/v2.0` for the token's own `tid`. Never accept an arbitrary issuer.
 
 ### 2.4 Platform and token settings
 
@@ -249,7 +249,7 @@ Open **Token configuration**:
 
 > **Copy the Value now.** Entra shows the secret **Value** only once. After you leave the page it cannot be viewed again. The **Secret ID** next to it is only a GUID and does not work as a secret.
 
-For production, Microsoft recommends a **certificate** or a federated credential instead of a shared secret. The planned adapter will start with `client_secret`.
+For production, Microsoft recommends a **certificate** or a federated credential instead of a shared secret. The adapter supports `client_secret` only.
 
 ### 3.2 Redirect URIs
 
@@ -324,13 +324,17 @@ SSO_PROVIDERS_AZURE_CLIENT_ID=<application-client-id>
 SSO_PROVIDERS_AZURE_CLIENT_SECRET=<client-secret-value>
 SSO_PROVIDERS_AZURE_TENANT_ID=<directory-tenant-id>
 SSO_PROVIDERS_AZURE_REDIRECT_URL=http://localhost:8080/auth/azure/callback
+# Multi-tenant only (common, organizations, consumers): tenant GUIDs allowed to sign in, comma separated
+# SSO_PROVIDERS_AZURE_ALLOWED_TENANTS=<tenant-guid>,<tenant-guid>
+# Sovereign clouds only (default https://login.microsoftonline.com)
+# SSO_PROVIDERS_AZURE_AUTHORITY=
 ```
 
 Rules for this file:
 
 - `scripts/start.sh` loads it with the shell, so use only `KEY=VALUE` lines. Quote any value that contains spaces or shell characters.
 - `SSO_PROVIDERS_AZURE_REDIRECT_URL` must equal one of the URIs registered in section 3.2 character for character, and equal `SSO_SERVER_BASE_URL` plus `/auth/azure/callback`.
-- `SSO_PROVIDERS_AZURE_TENANT_ID=common` is the placeholder in `.env.example`. Use a real tenant GUID for single-tenant apps.
+- `SSO_PROVIDERS_AZURE_TENANT_ID=common` is the value in `.env.example`. Use a real tenant GUID for single-tenant apps. With `common`, `organizations` or `consumers`, any tenant that Microsoft admits can sign in unless you set `SSO_PROVIDERS_AZURE_ALLOWED_TENANTS`. The provider is enabled only when the client id is not a sample value.
 - `.env` is already git-ignored. `.env.example` is the only variant that is committed, and it must contain placeholders only.
 
 ### 4.4 How the values are used
@@ -524,8 +528,8 @@ Inject the values as environment variables at deploy time instead of shipping a 
 | Signed, expiring, single-use `state` (CSRF protection) | Implemented |
 | PKCE with `S256` | Implemented in the manager and mock provider. Entra supports it for confidential clients |
 | Redirect URI exact match | Enforced by Entra. Keep the list minimal |
-| ID token validation (`iss`, `aud`, `tid`, `exp`, signature, `nonce`) | Planned in the `azure` adapter (RS256, keys from the tenant's JWKS) |
-| Issuer check against `tid` for `common` and `organizations` | Planned. Required for multi-tenant apps |
+| ID token validation (`iss`, `aud`, `tid`, `exp`, signature, `nonce`) | Implemented (RS256 only, keys from the tenant's JWKS, rotation-aware). `none` and HS256 are rejected |
+| Issuer check against `tid` for `common` and `organizations` | Implemented. For `common`, `organizations` and `consumers` the issuer must equal `<authority>/<tid>/v2.0` for the token's own `tid`. Set `SSO_PROVIDERS_AZURE_ALLOWED_TENANTS` to restrict which tenants may sign in |
 | HTTPS in every non-local environment | Required by Entra for non-localhost redirect URIs |
 | Do not echo tokens to the browser | The reference server returns the profile only |
 
@@ -628,7 +632,7 @@ The `redirect_uri` the application sent is not registered on that app.
 | `STATE_MISMATCH` | 400 | Forged, replayed, or already-used `state`, or state issued for a different provider. Restart login |
 | `STATE_EXPIRED` | 400 | The signed state exceeded its lifetime (10 minutes by default). Restart login |
 | `IDP_REJECTED` | 401 | Entra returned an `error` parameter, for example `access_denied` when the user clicked Cancel |
-| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. **Today this is always the result for `azure`**, because the adapter is not implemented. Once it exists, the provider is registered only when its Client ID and secret are set in `.env` |
+| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. `azure` is registered only when its Client ID and secret are set in `.env` |
 | `INVALID_CONFIG` | 500 | Startup problem, such as `SSO_STATE_SECRET` shorter than 32 bytes |
 | `NETWORK_FAILURE` | 502 | `ssod` could not reach Entra (discovery, JWKS or token endpoint) or got an unexpected reply. Check connectivity and proxy settings |
 | `SIGNATURE_INVALID` / `INVALID_TOKEN` / `TOKEN_EXPIRED` | 401 | The ID token failed verification (signature, issuer, audience, expiry). Check that the Client ID and tenant in `.env` match the token, and that the system clock is correct |
