@@ -36,7 +36,7 @@ func claims(f *oidctest.Fake, tid string) map[string]any {
 	c := oidctest.GoodClaims(f.URL()+"/"+tid+"/v2.0", client, nonce)
 	c["tid"] = tid
 	c["oid"] = "oid-1"
-	c["preferred_username"] = "ab@example.test"
+	c["preferred_username"] = "ab@example.com"
 	c["roles"] = []string{"Reader"}
 	c["groups"] = []string{"grp-1"}
 	return c
@@ -62,7 +62,7 @@ func TestSingleTenantFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := res.User
-	if u.Username != "ab@example.test" || u.TenantID != tenantA || len(u.Roles) != 1 || u.Roles[0] != "Reader" || len(u.Groups) != 1 {
+	if u.Username != "ab@example.com" || u.TenantID != tenantA || len(u.Roles) != 1 || u.Roles[0] != "Reader" || len(u.Groups) != 1 {
 		t.Errorf("user = %+v", u)
 	}
 	if u.EmailVerified {

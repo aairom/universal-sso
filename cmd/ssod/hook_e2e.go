@@ -34,10 +34,10 @@ func wrap(h http.Handler, getenv func(string) string) (http.Handler, error) {
 	auth0Iss := origin + "/idp/auth0/"
 	azureIss := origin + "/idp/azure/" + e2eTenant + "/v2.0"
 
-	okta := oidctest.NewInteractive(origin, mint(oktaIss, map[string]any{"preferred_username": "ab@example.test", "groups": []string{"Everyone"}}))
+	okta := oidctest.NewInteractive(origin, mint(oktaIss, map[string]any{"preferred_username": "ab@example.com", "groups": []string{"Everyone"}}))
 	auth0 := oidctest.NewInteractive(origin, mint(auth0Iss, map[string]any{"nickname": "ab", "roles": []string{"admin"}}))
 	auth0.DiscoveryIssuer(auth0Iss) // Auth0 signs iss with a trailing slash
-	azure := oidctest.NewInteractive(origin, mint(azureIss, map[string]any{"tid": e2eTenant, "preferred_username": "ab@example.test", "roles": []string{"Reader"}}))
+	azure := oidctest.NewInteractive(origin, mint(azureIss, map[string]any{"tid": e2eTenant, "preferred_username": "ab@example.com", "roles": []string{"Reader"}}))
 
 	mux := http.NewServeMux()
 	mux.Handle("/idp/okta/", okta.Handler())

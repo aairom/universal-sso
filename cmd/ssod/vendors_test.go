@@ -137,9 +137,9 @@ func TestVendorEndToEnd(t *testing.T) {
 				return map[string]string{"SSO_PROVIDERS_OKTA_CLIENT_ID": "okta-id", "SSO_PROVIDERS_OKTA_CLIENT_SECRET": vendorSec, "SSO_PROVIDERS_OKTA_ISSUER_URL": f.URL() + "/oauth2/default"}
 			},
 			issuer: func(f *oidctest.Fake) string { return f.URL() + "/oauth2/default" },
-			claims: map[string]any{"preferred_username": "ab@example.test", "groups": []string{"Everyone"}},
+			claims: map[string]any{"preferred_username": "ab@example.com", "groups": []string{"Everyone"}},
 			check: func(t *testing.T, u map[string]any) {
-				if u["username"] != "ab@example.test" || u["groups"] == nil {
+				if u["username"] != "ab@example.com" || u["groups"] == nil {
 					t.Errorf("okta user = %v", u)
 				}
 			},
@@ -163,7 +163,7 @@ func TestVendorEndToEnd(t *testing.T) {
 				return map[string]string{"SSO_PROVIDERS_AZURE_CLIENT_ID": "azure-id", "SSO_PROVIDERS_AZURE_CLIENT_SECRET": vendorSec, "SSO_PROVIDERS_AZURE_TENANT_ID": tenantGUID, "SSO_PROVIDERS_AZURE_AUTHORITY": f.URL()}
 			},
 			issuer: func(f *oidctest.Fake) string { return f.URL() + "/" + tenantGUID + "/v2.0" },
-			claims: map[string]any{"tid": tenantGUID, "preferred_username": "ab@example.test", "roles": []string{"Reader"}},
+			claims: map[string]any{"tid": tenantGUID, "preferred_username": "ab@example.com", "roles": []string{"Reader"}},
 			check: func(t *testing.T, u map[string]any) {
 				if u["tenant_id"] != tenantGUID || u["roles"] == nil {
 					t.Errorf("azure user = %v", u)

@@ -110,7 +110,7 @@ func TestGetAuthURL(t *testing.T) {
 	f := oidctest.New(t)
 	p := newProv(t, f, func(c *Config) { c.ExtraAuthParams = map[string]string{"audience": "api", "state": "evil"} })
 	resp, err := p.GetAuthURL(context.Background(), sso.AuthURLRequest{
-		State: "s1", Nonce: nonce, CodeVerifier: verifier, Prompt: "login", LoginHint: "a@example.test",
+		State: "s1", Nonce: nonce, CodeVerifier: verifier, Prompt: "login", LoginHint: "a@example.com",
 		ExtraParams: map[string]string{"client_id": "evil", "code_challenge_method": "plain", "x": "1"},
 	})
 	if err != nil {
@@ -122,7 +122,7 @@ func TestGetAuthURL(t *testing.T) {
 		"response_type": "code", "client_id": testClient, "redirect_uri": testRedirect,
 		"state": "s1", "nonce": nonce, "code_challenge_method": "S256",
 		"code_challenge": sso.CodeChallengeS256(verifier), "scope": "openid email profile",
-		"prompt": "login", "login_hint": "a@example.test", "audience": "api", "x": "1",
+		"prompt": "login", "login_hint": "a@example.com", "audience": "api", "x": "1",
 	}
 	for k, v := range want {
 		if q.Get(k) != v {
@@ -159,7 +159,7 @@ func TestHandleCallbackSuccess(t *testing.T) {
 			t.Fatalf("%s: %v", auth, err)
 		}
 		if res.ProviderID != "test" || res.Protocol != sso.ProtocolOIDC || res.User.ID != "user-1" ||
-			res.User.Email != "a@example.test" || !res.User.EmailVerified || res.User.DisplayName != "A B" ||
+			res.User.Email != "a@example.com" || !res.User.EmailVerified || res.User.DisplayName != "A B" ||
 			res.User.FirstName != "A" || res.User.LastName != "B" {
 			t.Errorf("%s: user = %+v", auth, res.User)
 		}
@@ -526,7 +526,7 @@ func TestFetchUserInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if u.ID != "user-1" || u.Email != "a@example.test" || !u.EmailVerified || len(u.Groups) != 1 {
+	if u.ID != "user-1" || u.Email != "a@example.com" || !u.EmailVerified || len(u.Groups) != 1 {
 		t.Errorf("user = %+v", u)
 	}
 	if _, err := p.FetchUserInfo(ctx, ""); code(t, err) != sso.ErrCodeInvalidToken {

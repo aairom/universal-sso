@@ -38,14 +38,14 @@ func TestOktaFlow(t *testing.T) {
 	}
 
 	c := oidctest.GoodClaims(iss, client, nonce)
-	c["preferred_username"] = "ab@example.test"
+	c["preferred_username"] = "ab@example.com"
 	c["groups"] = []string{"Everyone", "Admins"}
 	f.SetClaims(c)
 	res, err := p.HandleCallback(ctx, sso.CallbackRequest{Code: "c", CodeVerifier: verifier, Nonce: nonce})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.ProviderID != "okta" || res.User.Username != "ab@example.test" || len(res.User.Groups) != 2 || res.User.Groups[1] != "Admins" || res.User.TenantID != iss {
+	if res.ProviderID != "okta" || res.User.Username != "ab@example.com" || len(res.User.Groups) != 2 || res.User.Groups[1] != "Admins" || res.User.TenantID != iss {
 		t.Errorf("user = %+v", res.User)
 	}
 	cl, err := p.ValidateToken(ctx, res.Tokens.IDToken)

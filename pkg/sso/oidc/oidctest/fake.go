@@ -173,7 +173,7 @@ func GoodClaims(issuer, audience, nonce string) map[string]any {
 	return map[string]any{
 		"iss": issuer, "aud": audience, "sub": "user-1",
 		"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(),
-		"nonce": nonce, "email": "a@example.test", "email_verified": true,
+		"nonce": nonce, "email": "a@example.com", "email_verified": true,
 		"name": "A B", "given_name": "A", "family_name": "B",
 	}
 }
@@ -202,7 +202,7 @@ func (f *Fake) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"sub": "user-1", "email": "a@example.test", "email_verified": true, "name": "A B",
+			"sub": "user-1", "email": "a@example.com", "email_verified": true, "name": "A B",
 			"preferred_username": "ab", "groups": []string{"g1"},
 		})
 	case strings.HasSuffix(path, "/revoke"):
