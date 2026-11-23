@@ -2,7 +2,7 @@
 
 Step-by-step instructions for connecting **any OAuth 2.0 authorization server that is not OpenID Connect** (GitHub-style providers, Discord, Slack, Dropbox, a vendor's custom server) to Universal SSO: registering the client, redirect URIs, endpoints, client authentication, token handling, fetching the user profile, and wiring the values into the project. For providers that publish OIDC discovery, use the dedicated guides ([Google](Google-SSO-Setup.md), [Azure AD / Entra ID](Azure-AD-SSO-Setup.md), [Okta](Okta-SSO-Setup.md), [Auth0](Auth0-SSO-Setup.md)) instead: they give you a signed ID token and a standard identity.
 
-> **Project status.** Generic OAuth 2.0 is **planned, not yet implemented**. `pkg/sso` already defines `ProtocolOAuth2` and the generic provider interface, driver registry, state and PKCE handling that an `oauth2` driver will plug into. Until the adapter exists, `ssod` does not register `oauth2` and `/auth/oauth2/login` answers `404 PROVIDER_NOT_FOUND`. The `SSO_PROVIDERS_OAUTH2_*` variables in this guide are **proposed names**. They are not in `.env.example` yet and no code reads them. Everything on **the provider's side** (sections 1 to 3 and the manual checks in section 5) works today and is worth finishing first. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` instead.
+> **Project status.** Generic OAuth 2.0 is **implemented** as the `oauth2` driver (`pkg/sso/oauth2`) and registered by `ssod` when `SSO_PROVIDERS_OAUTH2_*` holds real values. It is verified **only against an in-process fake authorization server** (`oauth2test`), never against a live provider. `.env.example` ships the block with `-placeholder` values, so the provider stays off until you fill it in. The `make google-*` helpers are Google-only, so this guide uses `curl` and `python3` for the manual checks.
 
 Every OAuth 2.0 provider names its console and fields differently, and plain OAuth 2.0 leaves several things (user profile endpoint, user ID field, scopes) to the provider. This guide names the **generic fields** and uses `https://idp.example.com/...` placeholders. Always take exact endpoint URLs and scope names from your provider's documentation.
 
@@ -26,14 +26,14 @@ Every OAuth 2.0 provider names its console and fields differently, and plain OAu
 
 | # | Symptom | Cause | Go to |
 |---|---|---|---|
-| 1 | `/auth/oauth2/login` returns 404 | The `oauth2` adapter is not implemented yet, so the provider is never registered | [7.7](#77-errors-returned-by-this-project) |
+| 1 | `/auth/oauth2/login` returns 404 | The provider is not registered: `CLIENT_ID` or `CLIENT_SECRET` is empty or still a `-placeholder` value | [7.7](#77-errors-returned-by-this-project) |
 | 2 | "How do I know who the user is?" | Plain OAuth 2.0 has **no ID token**. You must call the provider's profile endpoint | [S2 below](#s2-oauth-20-is-not-sign-in-by-itself), [2.4](#24-the-user-profile-endpoint) |
 | 3 | `redirect_uri` error at the provider | The URI registered differs from the one sent by one character | [7.1](#71-redirect_uri-mismatch) |
 | 4 | The token response cannot be parsed | The provider answers with form-encoded text instead of JSON | [S3 below](#s3-token-response-is-not-json), [7.3](#73-the-token-response-is-not-json-or-lacks-fields) |
 | 5 | `invalid_client` at the token endpoint | Wrong secret, or the client authenticates with the wrong method (header vs body) | [7.2](#72-invalid_client-and-unauthorized_client) |
 | 6 | "I never saw the client secret" | Many providers show it once | [3.1](#31-obtain-the-client-id-and-client-secret) |
 | 7 | Two different accounts get merged | Accounts were linked on an unverified email address | [6.5](#65-identify-users-correctly) |
-| 8 | `.env` has no OAuth 2.0 block | The variables are proposed and not in `.env.example` yet | [4.3](#43-env-layout) |
+| 8 | `.env` has no OAuth 2.0 block | An older `.env` predates the block. Copy it from `.env.example` | [4.3](#43-env-layout) |
 
 ### Fastest path (about 15 minutes)
 
@@ -56,7 +56,7 @@ curl -s https://idp.example.com/.well-known/oauth-authorization-server \
 #    exchange it with the curl command in section 5.3. Then call the profile endpoint (5.3, step 5).
 ```
 
-A successful token exchange **and** a successful profile call (section 5.3) mean everything on the provider's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs the planned `oauth2` adapter.
+A successful token exchange **and** a successful profile call (section 5.3) mean everything on the provider's side is done. The last step, the end-to-end test through `ssod` (section 5.6), needs real values in the `SSO_PROVIDERS_OAUTH2_*` block.
 
 ### S1. Console navigation
 
@@ -83,7 +83,7 @@ Expected values for local development:
 
 ### S2. OAuth 2.0 is not sign-in by itself
 
-OAuth 2.0 (RFC 6749) is an **authorization** framework: it proves the user let your application access a resource, and gives you an **access token** for that resource. It does not define an identity. There is no `sub`, no `iss`, no `aud` check, and no signed ID token. To sign users in, the planned adapter will:
+OAuth 2.0 (RFC 6749) is an **authorization** framework: it proves the user let your application access a resource, and gives you an **access token** for that resource. It does not define an identity. There is no `sub`, no `iss`, no `aud` check, and no signed ID token. To sign users in, the adapter:
 
 1. Run the authorization code flow with PKCE and exchange the code for an **access token**.
 2. Call the provider's **user profile endpoint** with that token (for example `GET https://idp.example.com/user`).
@@ -93,11 +93,11 @@ Both the profile endpoint and the field names are **provider-specific**, so they
 
 ### S3. Token response is not JSON
 
-RFC 6749 section 5.1 says the token response is JSON. Some providers (GitHub is the well-known example) reply with `application/x-www-form-urlencoded` text such as `access_token=...&scope=...&token_type=bearer` unless the request sends `Accept: application/json`. The planned adapter will always send that header. In the manual steps below, `curl` sends it with `-H "Accept: application/json"`.
+RFC 6749 section 5.1 says the token response is JSON. Some providers (GitHub is the well-known example) reply with `application/x-www-form-urlencoded` text such as `access_token=...&scope=...&token_type=bearer` unless the request sends `Accept: application/json`. The adapter always sends that header. In the manual steps below, `curl` sends it with `-H "Accept: application/json"`.
 
 ### S4. The browser shows "This site can't be reached" after approval
 
-This is expected when `ssod` is not handling `/auth/oauth2/callback` (and today it is not, because the adapter is planned): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
+This is expected when `ssod` is not running on that address, or the provider is not registered (404 `PROVIDER_NOT_FOUND`): the page at `localhost:8080` has no server behind it, or the server answers `404 PROVIDER_NOT_FOUND`. The code you need is in the **address bar**. Copy the whole URL, including `?code=...&state=...`, and use it in section 5.3.
 
 ### S5. Who is allowed to approve
 
@@ -154,7 +154,7 @@ Client authentication at the token endpoint (RFC 6749 section 2.3.1):
 |---|---|---|
 | `client_secret_basic` | `Authorization: Basic base64(client_id:client_secret)` (each part form-urlencoded first) | The method the RFC requires every server to support. Preferred |
 | `client_secret_post` | `client_id` and `client_secret` in the request body | The RFC marks it **NOT RECOMMENDED**, but many providers only accept this. Use it when the provider says so |
-| `private_key_jwt`, mutual TLS | Signed assertion or client certificate | Stronger. Not planned for the first adapter |
+| `private_key_jwt`, mutual TLS | Signed assertion or client certificate | Stronger. Not supported by the adapter |
 
 ---
 
@@ -208,7 +208,7 @@ OAuth 2.0 does not say who may sign in. The provider usually lets anyone with an
 - membership in an organization or team (a second API call with the right scope), or
 - a provider-side setting that limits the app to an organization, if it has one.
 
-The planned adapter will start with an allow-list hook. Decide your rule before production.
+The adapter does **not** enforce an allow-list: any account the provider lets approve the app can sign in, and `ssod` returns its profile. Enforce your rule in the application that consumes the profile, or restrict the app at the provider. Decide your rule before production.
 
 ---
 
@@ -281,7 +281,7 @@ Most providers apply redirect URI changes immediately, but a few cache them for 
 
 ### 4.3 `.env` layout
 
-> **Proposed, not implemented.** These variable names are the intended contract for the `oauth2` adapter. They are **not** in `.env.example` and no code reads them yet. They may change when the adapter is written.
+These variables are read by `ssod` (`cmd/ssod/vendors.go`). The same block ships in `.env.example` with `-placeholder` values, so the provider stays switched off until you replace them. `SSO_PROVIDERS_OAUTH2_REVOKE_URL` is optional and enables token revocation (RFC 7009). Check your settings with `make provider-check P=oauth2`.
 
 ```bash
 # --- Server ---
@@ -290,7 +290,7 @@ SSO_SERVER_PORT=8080
 SSO_SERVER_BASE_URL=http://localhost:8080
 SSO_STATE_SECRET=<output of: openssl rand -base64 48>
 
-# --- Generic OAuth 2.0 (proposed names, values from your provider) ---
+# --- Generic OAuth 2.0 (values from your provider) ---
 SSO_PROVIDERS_OAUTH2_CLIENT_ID=<your-client-id>
 SSO_PROVIDERS_OAUTH2_CLIENT_SECRET=<your-client-secret>
 SSO_PROVIDERS_OAUTH2_AUTH_URL=https://idp.example.com/oauth/authorize
@@ -301,6 +301,8 @@ SSO_PROVIDERS_OAUTH2_USER_ID_FIELD=id
 SSO_PROVIDERS_OAUTH2_REDIRECT_URL=http://localhost:8080/auth/oauth2/callback
 # Optional: client authentication method, basic (default) or post
 # SSO_PROVIDERS_OAUTH2_AUTH_STYLE=basic
+# Optional: RFC 7009 revocation endpoint
+# SSO_PROVIDERS_OAUTH2_REVOKE_URL=https://idp.example.com/oauth/revoke
 ```
 
 Rules for this file:
@@ -329,7 +331,7 @@ Rules for this file:
 
 These checks use only `curl`, a browser, and `python3`. They validate the provider configuration independently of the application code. Replace the `idp.example.com` URLs, `<client-id>` and the other placeholders with your values.
 
-> **Note.** The `make google-*` helpers do not support generic OAuth 2.0. The steps below are the manual equivalent. A helper will come with the adapter.
+> **Note.** The `make google-*` helpers do not support generic OAuth 2.0. The steps below are the manual equivalent. `make provider-check P=oauth2` validates the `.env` settings (it does not call the provider).
 
 ### 5.1 Confirm the endpoints (or the metadata) are reachable
 
@@ -449,29 +451,31 @@ Confirm that failures fail safely:
 
 ### 5.5 Local server checks that need no provider account
 
-These confirm the server side that the OAuth 2.0 provider will plug into:
+These confirm the server side without a provider account:
 
 ```bash
 export SSO_STATE_SECRET=$(openssl rand -base64 48)
 make start
 curl -s http://127.0.0.1:8080/healthz
 curl -s http://127.0.0.1:8080/providers
-curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8080/auth/oauth2/login"                  # 404 until the adapter exists
+curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8080/auth/oauth2/login"                  # 404 until oauth2 is configured, 302 once it is
 curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8080/auth/mock/callback?state=forged"   # 400
 make stop
 ```
 
-The `mock` provider exercises the same state, PKCE and replay protections that the OAuth 2.0 provider will use.
+The `mock` provider exercises the same state, PKCE and replay protections that the OAuth 2.0 provider uses.
+
+To see the whole flow with no provider account, run the example client against the in-process **fake** provider: `make run-example EX=rust MODE=e2e`. That proves the adapter and the client work together. It does not prove your real provider accepts your configuration, so finish with 5.6.
 
 ### 5.6 End-to-end test through `ssod`
 
-This section applies once the `oauth2` adapter is implemented.
+This is the only step that proves a real provider works with your settings. It has not been run against any real provider by the project's authors.
 
 1. Fill in `.env` as in 4.3 and run `make start`. The log should show `oauth2` among the providers.
 2. Open `http://localhost:8080/auth/oauth2/login` in a browser.
 3. You should be redirected to the provider, approve, and land on `/auth/oauth2/callback`, which returns JSON with your user profile (no tokens).
 4. Reload the callback URL. It must fail with `STATE_MISMATCH` because the state is single use.
-5. Repeat with an account that your allow-list rejects (2.5) and confirm the server refuses it with `UNAUTHORIZED`.
+5. Confirm the provider restricts who may approve (2.5). The adapter itself has no allow-list.
 
 ---
 
@@ -509,11 +513,12 @@ Inject the values as environment variables at deploy time instead of shipping a 
 | Control | Status in this project |
 |---|---|
 | Signed, expiring, single-use `state` (CSRF protection) | Implemented |
-| PKCE with `S256` (RFC 7636, required by RFC 9700 for all clients) | Implemented in the manager and mock provider. Whether the **provider** enforces it varies. Send it anyway |
+| PKCE with `S256` (RFC 7636, required by RFC 9700 for all clients) | Implemented in the manager and the adapter, which sends the verifier at the token endpoint. Whether the **provider** enforces it varies. Send it anyway |
 | Redirect URI exact match | Enforced by the provider. Keep the list minimal and avoid wildcards |
-| Issuer check with the `iss` response parameter (RFC 9207) | Planned, only if the provider returns it. Protects against mix-up attacks when several providers are configured |
-| Profile and token URLs fixed in configuration, over HTTPS | Planned. Never take endpoints from request data |
-| Send `Accept: application/json` and parse strictly | Planned (S3) |
+| Issuer check with the `iss` response parameter (RFC 9207) | Not implemented. Would protect against mix-up attacks when several providers are configured |
+| Profile and token URLs fixed in configuration, over HTTPS | Implemented. URLs come only from `.env`, must be `https` (`http` only for loopback), and are never taken from request data |
+| Send `Accept: application/json` and parse strictly | Implemented (S3). A non-JSON token reply, a non-bearer `token_type` or an `error` member (even at HTTP 200) is rejected |
+| Authorization codes are single use | Verified against the fake provider only |
 | Do not echo tokens to the browser | The reference server returns the profile only |
 | HTTPS in every non-local environment | Required |
 
@@ -619,11 +624,12 @@ The `redirect_uri` the application sent is not registered on that app.
 | `STATE_MISMATCH` | 400 | Forged, replayed, or already-used `state`, or state issued for a different provider. Restart login |
 | `STATE_EXPIRED` | 400 | The signed state exceeded its lifetime (10 minutes by default). Restart login |
 | `IDP_REJECTED` | 401 | The provider returned an `error` parameter, for example `access_denied` when the user clicked Cancel |
-| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. **Today this is always the result for `oauth2`**, because the adapter is not implemented. Once it exists, the provider is registered only when its Client ID, secret and URLs are set in `.env` |
+| `PROVIDER_NOT_FOUND` | 404 | The provider ID in the URL is not registered. `oauth2` is registered only when its Client ID, secret and URLs are set to real values in `.env`, and `ssod` was (re)started afterwards |
+| `UNSUPPORTED_METHOD` | 501 | Logout was requested (plain OAuth 2.0 has no logout endpoint), or revocation without `SSO_PROVIDERS_OAUTH2_REVOKE_URL` |
 | `INVALID_CONFIG` | 500 | Startup problem, such as `SSO_STATE_SECRET` shorter than 32 bytes, or a missing or non-HTTPS endpoint URL |
 | `NETWORK_FAILURE` | 502 | `ssod` could not reach the token or profile endpoint, or got an unexpected reply. Check connectivity and proxy settings. A non-JSON token reply also ends here (7.3) |
 | `SIGNATURE_INVALID` / `INVALID_TOKEN` / `TOKEN_EXPIRED` | 401 | There is no ID token to verify in plain OAuth 2.0. These codes come from a rejected access token (the profile call returned `401`) or a missing user ID field |
-| `UNAUTHORIZED` | 401 | Sign-in succeeded at the provider but the account is rejected by the application's allow-list or organization rule (2.5) |
+| `UNAUTHORIZED` | 401 | Not returned by the `oauth2` adapter, which has no allow-list. Use it in your own application if you add one (2.5) |
 
 ### 7.8 Localhost versus production confusion
 

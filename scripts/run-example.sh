@@ -10,16 +10,17 @@
 # Modes
 #   mock  (default) Needs no credentials. Builds ssod, starts a throw-away gateway with only the
 #                   mock provider, builds the client and completes a full sign-in with --follow.
-#   e2e             Same, but ssod is built with -tags e2e and serves in-process FAKE Okta, Auth0
-#                   and Entra servers. Proves the adapters and the client work together. It does
-#                   NOT prove your real tenant works. --provider: okta, auth0, azure or mock.
+#   e2e             Same, but ssod is built with -tags e2e and serves in-process FAKE Okta, Auth0,
+#                   Entra and generic OAuth 2.0 servers. Proves the adapters and the client work
+#                   together. It does NOT prove your real tenant works.
+#                   --provider: okta, auth0, azure, oauth2 or mock.
 #   real            Uses YOUR .env: validates it (provider-check.sh / ssoctl), starts the project
 #                   gateway through scripts/start.sh, builds the client and prints the browser URL.
 #                   You finish the sign-in in a browser; the callback shows your profile as JSON.
 #
 # Default provider per example: rust=oauth2, go=saml, python=auth0, java=okta, csharp=azure.
-# SAML and generic OAuth 2.0 adapters do not exist yet, so for rust and go pass --provider
-# (okta, auth0, azure, google or mock) in e2e and real mode.
+# The SAML adapter does not exist yet, so for go pass --provider (okta, auth0, azure, oauth2,
+# google or mock) in e2e and real mode.
 #
 # Prerequisites (checked before anything is built):
 #   all     bash, curl, Go (builds ssod; go.mod sets the version)
@@ -39,7 +40,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/scripts/sso-common.sh"
 cd "$ROOT" || die "cannot enter $ROOT"
 
-usage() { sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n '2,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 fail_usage() { echo "ERROR: $1" >&2; echo "Run scripts/run-example.sh --help for usage." >&2; exit 2; }
 
 EX=""; MODE=mock; PROVIDER=""; PORT=18932; KEEP=0; OPEN=0; CHECK_ONLY=0
@@ -86,9 +87,9 @@ if [ "$MODE" = mock ]; then
 else
   PROVIDER="${PROVIDER:-$DEFAULT_PROVIDER}"
   case "$PROVIDER" in
-    okta | auth0 | azure | mock) ;;
+    okta | auth0 | azure | oauth2 | mock) ;;
     google) [ "$MODE" = real ] || fail_usage "google exists only in real mode (the e2e gateway has no fake Google)" ;;
-    saml | oauth2) fail_usage "the gateway has no '$PROVIDER' adapter yet (planned, see Docs/Architecture.md). Add --provider okta, auth0, azure, google or mock" ;;
+    saml) fail_usage "the gateway has no 'saml' adapter yet (planned, see Docs/Architecture.md). Add --provider okta, auth0, azure, oauth2, google or mock" ;;
     *) fail_usage "unknown provider '$PROVIDER'" ;;
   esac
 fi
@@ -178,6 +179,9 @@ else
       SSO_PROVIDERS_AUTH0_CLIENT_ID=e2e-auth0 SSO_PROVIDERS_AUTH0_CLIENT_SECRET=e2e-value SSO_PROVIDERS_AUTH0_ISSUER_URL="$base/idp/auth0"
       SSO_PROVIDERS_AZURE_CLIENT_ID=e2e-azure SSO_PROVIDERS_AZURE_CLIENT_SECRET=e2e-value
       SSO_PROVIDERS_AZURE_TENANT_ID=11111111-1111-1111-1111-111111111111 SSO_PROVIDERS_AZURE_AUTHORITY="$base/idp/azure"
+      SSO_PROVIDERS_OAUTH2_CLIENT_ID=e2e-oauth2 SSO_PROVIDERS_OAUTH2_CLIENT_SECRET=e2e-value
+      SSO_PROVIDERS_OAUTH2_AUTH_URL="$base/idp/oauth2/authorize" SSO_PROVIDERS_OAUTH2_TOKEN_URL="$base/idp/oauth2/token"
+      SSO_PROVIDERS_OAUTH2_USERINFO_URL="$base/idp/oauth2/user" SSO_PROVIDERS_OAUTH2_SCOPES="read:user user:email"
     ) # nosecret: throw-away values for the in-process fake IdPs
   fi
   echo "== starting throw-away gateway on $base"
@@ -227,6 +231,7 @@ if [ "$MODE" = real ] && [ -z "${SSO_EXPECTED_IDP_HOST+x}" ]; then
     okta) u="$(envget "$ENV_FILE" SSO_PROVIDERS_OKTA_ISSUER_URL)" ;;
     auth0) u="$(envget "$ENV_FILE" SSO_PROVIDERS_AUTH0_ISSUER_URL)" ;;
     azure) u="$(envget "$ENV_FILE" SSO_PROVIDERS_AZURE_AUTHORITY)"; u="${u:-https://login.microsoftonline.com}" ;;
+    oauth2) u="$(envget "$ENV_FILE" SSO_PROVIDERS_OAUTH2_AUTH_URL)" ;;
     google) u="https://accounts.google.com" ;;
     *) u="" ;;
   esac

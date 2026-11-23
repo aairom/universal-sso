@@ -57,11 +57,17 @@ graph TD
 | **Auth0** | OIDC / OAuth2 | Authorization Code + PKCE | Audience validation, custom namespace claims, refresh rotation |
 | **Azure AD (Entra ID)** | OIDC / SAML2 | Authorization Code + PKCE | Multi-tenant (`common`/`organizations`) & single-tenant, v2.0 endpoint, roles/groups |
 | **Google Workspace** | OIDC / OAuth2 | Authorization Code + PKCE | Hosted domain (`hd`) filtering, offline access refresh tokens, profile info |
-| **Generic SAML 2.0** | SAML 2.0 HTTP-Redirect / POST | SP-Initiated / IdP-Initiated | Metadata XML parsing, X.509 cert validation, assertion decryption, AuthnRequest signing |
-| **Generic OAuth 2.0** | OAuth 2.0 (RFC 6749) | Authorization Code / Client Credentials | Standard token endpoint, custom header auth, basic auth |
+| **Generic OAuth 2.0** (implemented, `pkg/sso/oauth2`) | OAuth 2.0 (RFC 6749) | Authorization Code + PKCE (S256) | Configured endpoints, `basic` or `post` client authentication, profile endpoint as the identity source, refresh, optional RFC 7009 revocation. No ID token, no nonce, no logout |
+| **Generic SAML 2.0** (planned) | SAML 2.0 HTTP-Redirect / POST | SP-Initiated (IdP-Initiated is refused) | Metadata XML parsing, X.509 cert validation, assertion decryption, AuthnRequest signing |
 | **Mock Provider** | In-Memory Simulation | Synthetic Auth Flow | Full cryptographic simulation for CI/CD and offline testing |
 
-Setup guides: [Google](Google-SSO-Setup.md), [Azure AD / Entra ID](Azure-AD-SSO-Setup.md), [Okta](Okta-SSO-Setup.md) and [Auth0](Auth0-SSO-Setup.md) are implemented. [Generic SAML 2.0](SAML-SSO-Setup.md) and [Generic OAuth 2.0](OAuth2-SSO-Setup.md) are planned adapters.
+Setup guides: [Google](Google-SSO-Setup.md), [Azure AD / Entra ID](Azure-AD-SSO-Setup.md), [Okta](Okta-SSO-Setup.md), [Auth0](Auth0-SSO-Setup.md) and [Generic OAuth 2.0](OAuth2-SSO-Setup.md) are implemented. [Generic SAML 2.0](SAML-SSO-Setup.md) is a planned adapter.
+
+### Generic OAuth 2.0 adapter
+
+`pkg/sso/oauth2` is for providers that are not OpenID Connect (for example a GitHub-style API). You configure the authorization, token and profile URLs yourself. Because plain OAuth 2.0 has no ID token, the trust anchor is the access token received over HTTPS from the configured token URL and used against the configured profile URL. Neither URL ever comes from request data. `EmailVerified` is always false, because the profile endpoint gives no verified-email guarantee.
+
+Security properties, each covered by a unit test: PKCE S256 is mandatory, the token reply must be JSON with a bearer `token_type`, an `error` member is honoured even at HTTP 200, the authorization code is single use, and responses are capped at 1 MiB.
 
 ### OIDC vendor adapters
 
@@ -88,7 +94,7 @@ Security properties, each covered by a unit test: only RS256 is accepted (`none`
 
 ### Verification boundary
 
-`pkg/sso/oidc/oidctest` is an in-process fake OIDC server. The unit tests and `tests/e2e.sh` (the gateway built with `-tags e2e`, all five example clients, four providers) run against it. That proves the code, not a live tenant. See [Examples.md](Examples.md#end-to-end-check).
+`pkg/sso/oidc/oidctest` and `pkg/sso/oauth2/oauth2test` are in-process fake servers. The unit tests and `tests/e2e.sh` (the gateway built with `-tags e2e`, all five example clients, five providers) run against them. That proves the code, not a live tenant or provider. See [Examples.md](Examples.md#end-to-end-check).
 
 Example gateway clients (Rust, Go, Python, Java, C#) are described in [Examples.md](Examples.md). The validation gates and documentation status are summarised in the generated [Documentation-Audit.html](Documentation-Audit.html).
 

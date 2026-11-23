@@ -16,9 +16,9 @@ test-e2e:
 test-scripts:
 	bash tests/scripts_test.sh
 
-# Usage: make provider-check P=okta|auth0|azure
+# Usage: make provider-check P=okta|auth0|azure|oauth2
 provider-check:
-	@test -n "$(P)" || { echo "usage: make provider-check P=okta|auth0|azure"; exit 2; }
+	@test -n "$(P)" || { echo "usage: make provider-check P=okta|auth0|azure|oauth2"; exit 2; }
 	scripts/provider-check.sh $(P)
 
 # Usage: make run-example EX=rust|go|python|java|csharp [MODE=mock|e2e|real] [PROVIDER=id]

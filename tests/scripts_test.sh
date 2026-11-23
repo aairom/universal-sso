@@ -52,8 +52,11 @@ good() { # provider, extra lines...
 good okta SSO_PROVIDERS_OKTA_CLIENT_ID=0oaTEST1 SSO_PROVIDERS_OKTA_CLIENT_SECRET=testvalue1 SSO_PROVIDERS_OKTA_ISSUER_URL=https://corp.okta.test/oauth2/default
 good auth0 SSO_PROVIDERS_AUTH0_CLIENT_ID=abc123 SSO_PROVIDERS_AUTH0_CLIENT_SECRET=testvalue1 SSO_PROVIDERS_AUTH0_ISSUER_URL=https://corp.eu.auth0.test/
 good azure SSO_PROVIDERS_AZURE_CLIENT_ID=abc123 SSO_PROVIDERS_AZURE_CLIENT_SECRET=testvalue1 SSO_PROVIDERS_AZURE_TENANT_ID=11111111-1111-1111-1111-111111111111
+good oauth2 SSO_PROVIDERS_OAUTH2_CLIENT_ID=abc123 SSO_PROVIDERS_OAUTH2_CLIENT_SECRET=testvalue1 \
+  SSO_PROVIDERS_OAUTH2_AUTH_URL=https://idp.corp.test/authorize SSO_PROVIDERS_OAUTH2_TOKEN_URL=https://idp.corp.test/token \
+  SSO_PROVIDERS_OAUTH2_USERINFO_URL=https://idp.corp.test/user "SSO_PROVIDERS_OAUTH2_SCOPES=read:user user:email"
 
-for p in okta auth0 azure; do
+for p in okta auth0 azure oauth2; do
   expect "provider-check $p: valid settings pass" 0 scripts/provider-check.sh $p --env "$TMP/$p.env"
   contains "provider-check $p: shows the redirect URI to register" "/auth/$p/callback"
   lacks "provider-check $p: never prints the secret value" "testvalue1"
@@ -78,6 +81,15 @@ echo "SSO_PROVIDERS_AZURE_ALLOWED_TENANTS=not-a-guid" >>"$TMP/azure-multi.env"
 expect "provider-check: non-GUID allowed tenant fails" 1 scripts/provider-check.sh azure --env "$TMP/azure-multi.env"
 sed -i.bak 's/^SSO_PROVIDERS_AZURE_TENANT_ID=.*/SSO_PROVIDERS_AZURE_TENANT_ID=bad tenant!/' "$TMP/azure.env"
 expect "provider-check: malformed tenant fails" 1 scripts/provider-check.sh azure --env "$TMP/azure.env"
+sed 's#^SSO_PROVIDERS_OAUTH2_TOKEN_URL=.*#SSO_PROVIDERS_OAUTH2_TOKEN_URL=http://idp.corp.test/token#' "$TMP/oauth2.env" >"$TMP/oauth2-http.env"
+expect "provider-check oauth2: http token URL on a non-loopback host fails" 1 scripts/provider-check.sh oauth2 --env "$TMP/oauth2-http.env"
+grep -v '^SSO_PROVIDERS_OAUTH2_USERINFO_URL=' "$TMP/oauth2.env" >"$TMP/oauth2-nouser.env"
+expect "provider-check oauth2: missing profile URL fails" 1 scripts/provider-check.sh oauth2 --env "$TMP/oauth2-nouser.env"
+contains "provider-check oauth2: names the missing variable" "SSO_PROVIDERS_OAUTH2_USERINFO_URL is not set"
+cp "$TMP/oauth2.env" "$TMP/oauth2-style.env"; echo "SSO_PROVIDERS_OAUTH2_AUTH_STYLE=header" >>"$TMP/oauth2-style.env"
+expect "provider-check oauth2: unknown auth style fails" 1 scripts/provider-check.sh oauth2 --env "$TMP/oauth2-style.env"
+cp "$TMP/oauth2.env" "$TMP/oauth2-post.env"; echo "SSO_PROVIDERS_OAUTH2_AUTH_STYLE=post" >>"$TMP/oauth2-post.env"
+expect "provider-check oauth2: auth style post passes" 0 scripts/provider-check.sh oauth2 --env "$TMP/oauth2-post.env"
 expect "provider-check: missing env file fails with a hint" 1 scripts/provider-check.sh okta --env "$TMP/none.env"
 contains "provider-check: hint names .env.example" "cp .env.example .env"
 expect "provider-check: unknown provider is a usage error" 2 scripts/provider-check.sh nope
@@ -95,7 +107,7 @@ expect "run-example: option without value" 2 scripts/run-example.sh python --mod
 expect "run-example: mock mode refuses a vendor provider" 2 scripts/run-example.sh python --mode mock --provider okta
 expect "run-example: saml has no adapter" 2 scripts/run-example.sh go --mode e2e
 contains "run-example: explains saml is planned" "no 'saml' adapter yet"
-expect "run-example: oauth2 has no adapter" 2 scripts/run-example.sh rust --mode real
+expect "run-example: oauth2 is accepted (rust default, toolchain check only)" 0 scripts/run-example.sh rust --mode e2e --check-only
 expect "run-example: google is real-only" 2 scripts/run-example.sh python --mode e2e --provider google
 expect "run-example --check-only builds nothing" 0 scripts/run-example.sh python --mode mock --check-only
 OUT="$(cd "$TMP" && ROOT_OVERRIDE=1 bash "$ROOT/scripts/run-example.sh" --help 2>&1)"; contains "run-example --help documents the modes" "Modes"
@@ -109,6 +121,8 @@ if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then bad "run-example: gate
 expect "run-example python e2e okta: fake IdP sign-in" 0 scripts/run-example.sh python --mode e2e --provider okta --port "$PORT"
 contains "run-example e2e: labels the IdP as fake" "FAKE identity provider"
 contains "run-example e2e: signed in via okta" "signed in via okta"
+expect "run-example python e2e oauth2: fake IdP sign-in" 0 scripts/run-example.sh python --mode e2e --provider oauth2 --port "$PORT"
+contains "run-example e2e oauth2: signed in via oauth2" "signed in via oauth2"
 
 echo "== scripts: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

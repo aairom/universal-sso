@@ -2,7 +2,7 @@
 
 A modular Go SDK that gives applications one `Provider` abstraction over OIDC, OAuth 2.0 and SAML 2.0 identity providers. The core ships signed state (HMAC), mandatory PKCE (S256), one-time-use login state, a pluggable cache, a driver registry and an in-memory mock provider for tests.
 
-**Status:** core, `Manager`, registry, mock provider and the **Google OIDC provider** (`pkg/sso/google`) are implemented. The **Okta, Auth0 and Microsoft Entra ID OIDC adapters** (`pkg/sso/okta`, `auth0`, `entra`, on the shared `pkg/sso/oidc`) are implemented and tested against a fake IdP, not yet against live tenants. SAML 2.0 and generic OAuth 2.0 adapters are planned; see [Docs/Architecture.md](Docs/Architecture.md).
+**Status:** core, `Manager`, registry, mock provider and the **Google OIDC provider** (`pkg/sso/google`) are implemented. The **Okta, Auth0 and Microsoft Entra ID OIDC adapters** (`pkg/sso/okta`, `auth0`, `entra`, on the shared `pkg/sso/oidc`) and the **generic OAuth 2.0 adapter** (`pkg/sso/oauth2`) are implemented and tested against fake IdPs, not yet against live tenants or providers. The SAML 2.0 adapter is planned; see [Docs/Architecture.md](Docs/Architecture.md).
 
 ## Architecture
 
@@ -80,10 +80,10 @@ Each guide follows the same structure: quick-start, how the pieces fit, provider
 | Azure AD / Microsoft Entra ID | [Docs/Azure-AD-SSO-Setup.md](Docs/Azure-AD-SSO-Setup.md) | Implemented (fake-IdP tested) |
 | Okta | [Docs/Okta-SSO-Setup.md](Docs/Okta-SSO-Setup.md) | Implemented (fake-IdP tested) |
 | Auth0 | [Docs/Auth0-SSO-Setup.md](Docs/Auth0-SSO-Setup.md) | Implemented (fake-IdP tested) |
+| Generic OAuth 2.0 | [Docs/OAuth2-SSO-Setup.md](Docs/OAuth2-SSO-Setup.md) | Implemented (`pkg/sso/oauth2`, fake-provider tested) |
 | Generic SAML 2.0 | [Docs/SAML-SSO-Setup.md](Docs/SAML-SSO-Setup.md) | Planned |
-| Generic OAuth 2.0 | [Docs/OAuth2-SSO-Setup.md](Docs/OAuth2-SSO-Setup.md) | Planned |
 
-Okta, Auth0 and Azure AD are verified against an in-process fake OIDC server only (`bash tests/e2e.sh` signs every example client in through each adapter). They have **not** been exercised against a live tenant. For SAML 2.0 and generic OAuth 2.0 (planned) the identity-provider side can be configured and verified with the manual steps in each guide, and `ssod` answers `404 PROVIDER_NOT_FOUND`.
+Okta, Auth0, Azure AD and generic OAuth 2.0 are verified against in-process fake servers only (`bash tests/e2e.sh` signs every example client in through each adapter). They have **not** been exercised against a live tenant or provider. For SAML 2.0 (planned) the identity-provider side can be configured and verified with the manual steps in the guide, and `ssod` answers `404 PROVIDER_NOT_FOUND`.
 
 ## Lifecycle scripts
 
@@ -98,14 +98,14 @@ Okta, Auth0 and Azure AD are verified against an in-process fake OIDC server onl
 
 | Command | Script | Behaviour |
 |---|---|---|
-| `make provider-check P=okta` | `scripts/provider-check.sh <okta\|auth0\|azure> [--online]` | Validates the vendor's settings in `.env` (placeholders, https, tenant, redirect URI) and prints the redirect URI to register. Never prints secret values. Read-only. |
+| `make provider-check P=okta` | `scripts/provider-check.sh <okta\|auth0\|azure\|oauth2> [--online]` | Validates the provider's settings in `.env` (placeholders, https, tenant or endpoints, redirect URI) and prints the redirect URI to register. Never prints secret values. Read-only. |
 | `make run-example EX=python` | `scripts/run-example.sh <rust\|go\|python\|java\|csharp> [--mode mock\|e2e\|real] [--provider ID]` | Builds the gateway and the client, starts a gateway, checks that the provider is registered and runs `check` and `login`. `mock` (default) needs no credentials. `e2e` uses fake IdPs. `real` validates your `.env`, starts the project gateway and prints the browser URL. |
 
-`scripts/run-example.sh --list` shows the example-to-provider map. The Rust and Go examples default to providers that do not exist yet (`oauth2`, `saml`), so pass `--provider okta`, `auth0`, `azure`, `google` or `mock` for them. Full usage: [Docs/Examples.md](Docs/Examples.md#launch-scripts).
+`scripts/run-example.sh --list` shows the example-to-provider map. The Rust example defaults to `oauth2`, which now exists. The Go example defaults to `saml`, which does not exist yet, so pass `--provider okta`, `auth0`, `azure`, `oauth2`, `google` or `mock` for it. Full usage: [Docs/Examples.md](Docs/Examples.md#launch-scripts).
 
 State lives in `.run/` (`app.pid`, `app.log`, `ssod`), which is git-ignored. Variables: `SSO_SERVER_HOST` (default `127.0.0.1`), `SSO_SERVER_PORT` (default `8080`), `SSO_STATE_SECRET` (required), `START_TIMEOUT`, `STOP_TIMEOUT`.
 
-`ssod` endpoints: `GET /` (landing page with login links), `GET /mock/authorize` (local stand-in IdP for the mock provider), `GET /healthz`, `GET /providers`, `GET /auth/{provider}/login`, `GET /auth/{provider}/callback`. It always registers `mock`, and registers `google` when `SSO_PROVIDERS_GOOGLE_CLIENT_ID` and `SSO_PROVIDERS_GOOGLE_CLIENT_SECRET` are set to real values (optional `SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN`). The registered providers are logged at startup and listed at `/providers`.
+`ssod` endpoints: `GET /` (landing page with login links), `GET /mock/authorize` (local stand-in IdP for the mock provider), `GET /healthz`, `GET /providers`, `GET /auth/{provider}/login`, `GET /auth/{provider}/callback`, `POST /auth/{provider}/callback` (form fields `SAMLResponse` and `RelayState`, reserved for the planned SAML adapter; every other provider refuses it because it carries no code). It always registers `mock`, and registers `google` when `SSO_PROVIDERS_GOOGLE_CLIENT_ID` and `SSO_PROVIDERS_GOOGLE_CLIENT_SECRET` are set to real values (optional `SSO_PROVIDERS_GOOGLE_HOSTED_DOMAIN`). The registered providers are logged at startup and listed at `/providers`.
 
 ## License
 

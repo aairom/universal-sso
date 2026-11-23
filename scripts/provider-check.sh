@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Validate the gateway settings for one OIDC vendor adapter before you try to sign in.
-# This is the Okta / Auth0 / Entra counterpart of `make google-check`.
+# Validate the gateway settings for one adapter before you try to sign in.
+# This is the Okta / Auth0 / Entra / generic OAuth 2.0 counterpart of `make google-check`.
 #
-# Usage:   scripts/provider-check.sh <okta|auth0|azure> [--env FILE] [--online]
+# Usage:   scripts/provider-check.sh <okta|auth0|azure|oauth2> [--env FILE] [--online]
 #   --env FILE   env file to read (default: .env in the project root)
-#   --online     also fetch the provider's OpenID discovery document (needs network)
+#   --online     also fetch the provider's OpenID discovery document (needs network).
+#                oauth2 has no discovery document, so --online checks nothing for it.
 #
 # Prerequisites: bash, grep, sed. curl only for --online.
 # Reads (never prints secret values): SSO_STATE_SECRET, SSO_SERVER_*, and for the chosen
-# provider SSO_PROVIDERS_<OKTA|AUTH0|AZURE>_{CLIENT_ID,CLIENT_SECRET,REDIRECT_URL,...}.
-# See .env.example and Docs/<Okta|Auth0|Azure-AD>-SSO-Setup.md.
+# provider SSO_PROVIDERS_<OKTA|AUTH0|AZURE|OAUTH2>_{CLIENT_ID,CLIENT_SECRET,REDIRECT_URL,...}.
+# See .env.example and Docs/<Okta|Auth0|Azure-AD|OAuth2>-SSO-Setup.md.
 #
 # Read-only and idempotent: it changes nothing. Exit: 0 ready, 1 at least one FAIL, 2 bad usage.
 set -uo pipefail
@@ -17,7 +18,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/sso-common.sh
 . "$ROOT/scripts/sso-common.sh"
 
-usage() { echo "usage: provider-check.sh <okta|auth0|azure> [--env FILE] [--online]" >&2; exit 2; }
+usage() { echo "usage: provider-check.sh <okta|auth0|azure|oauth2> [--env FILE] [--online]" >&2; exit 2; }
 
 PROVIDER="${1:-}"; [ $# -gt 0 ] && shift
 ENV_FILE="$ROOT/.env"; ONLINE=0
@@ -33,6 +34,7 @@ case "$PROVIDER" in
   okta) PREFIX=SSO_PROVIDERS_OKTA; LABEL=Okta; GUIDE=Docs/Okta-SSO-Setup.md ;;
   auth0) PREFIX=SSO_PROVIDERS_AUTH0; LABEL=Auth0; GUIDE=Docs/Auth0-SSO-Setup.md ;;
   azure) PREFIX=SSO_PROVIDERS_AZURE; LABEL="Microsoft Entra ID"; GUIDE=Docs/Azure-AD-SSO-Setup.md ;;
+  oauth2) PREFIX=SSO_PROVIDERS_OAUTH2; LABEL="generic OAuth 2.0"; GUIDE=Docs/OAuth2-SSO-Setup.md ;;
   *) usage ;;
 esac
 
@@ -151,6 +153,24 @@ case "$PROVIDER" in
       DISCOVERY="${AUTH%/}/$TENANT/v2.0/.well-known/openid-configuration"
     fi
     ;;
+  oauth2)
+    for v in AUTH_URL TOKEN_URL USERINFO_URL; do
+      val="$(get "${PREFIX}_$v")"
+      if [ -z "$val" ]; then
+        fail "${PREFIX}_$v is not set" "copy it from the provider's OAuth documentation ($GUIDE)"
+      elif [[ "$val" == *example.com* || "$val" == *example.org* || "$val" == *-placeholder* ]]; then
+        fail "${PREFIX}_$v is still a sample value" "use your provider's real endpoint"
+      elif secure_url "${PREFIX}_$v" "$val"; then
+        ok "${PREFIX}_$v is a valid URL"
+      fi
+    done
+    STYLE="$(get "${PREFIX}_AUTH_STYLE")"
+    case "$STYLE" in
+      "" | basic | post) ok "${PREFIX}_AUTH_STYLE is ${STYLE:-basic (default)}" ;;
+      *) fail "${PREFIX}_AUTH_STYLE must be basic or post, got: $STYLE" "see $GUIDE" ;;
+    esac
+    [ -z "$(get "${PREFIX}_SCOPES")" ] && warn "${PREFIX}_SCOPES is empty: the provider's default scope applies" "list the scopes your profile endpoint needs"
+    ;;
 esac
 
 # --- redirect URI: must match the IdP console exactly ---
@@ -178,7 +198,9 @@ fi
 
 # --- optional network check ---
 if [ "$ONLINE" -eq 1 ]; then
-  if [ -z "$DISCOVERY" ]; then
+  if [ "$PROVIDER" = oauth2 ]; then
+    warn "--online has nothing to check for oauth2: it has no discovery document"
+  elif [ -z "$DISCOVERY" ]; then
     warn "skipped the discovery check: the issuer settings above are not usable yet"
   elif ! command -v curl >/dev/null 2>&1; then
     fail "--online needs curl, which is not installed" "install curl or drop --online"
