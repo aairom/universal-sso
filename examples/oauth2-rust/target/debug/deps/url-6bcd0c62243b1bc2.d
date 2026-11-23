@@ -1,0 +1,11 @@
+/Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/deps/url-6bcd0c62243b1bc2.d: /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/lib.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/host.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/origin.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/parser.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/path_segments.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/slicing.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/quirks.rs
+
+/Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/deps/liburl-6bcd0c62243b1bc2.rmeta: /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/lib.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/host.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/origin.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/parser.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/path_segments.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/slicing.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/quirks.rs
+
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/lib.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/host.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/origin.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/parser.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/path_segments.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/slicing.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/url-2.5.9/src/quirks.rs:

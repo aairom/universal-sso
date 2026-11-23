@@ -1,0 +1,14 @@
+/Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/deps/serde-9125cebcaa4a620d.d: /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/build/serde-96533ca132bdbf45/out/private.rs
+
+/Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/deps/libserde-9125cebcaa4a620d.rlib: /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/build/serde-96533ca132bdbf45/out/private.rs
+
+/Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/deps/libserde-9125cebcaa4a620d.rmeta: /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/build/serde-96533ca132bdbf45/out/private.rs
+
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/Users/alainairom/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/build/serde-96533ca132bdbf45/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/alainairom/Devs/universal-sso/examples/oauth2-rust/target/debug/build/serde-96533ca132bdbf45/out

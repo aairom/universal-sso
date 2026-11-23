@@ -1,0 +1,241 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>azure-ad-csharp</name>
+    </assembly>
+    <members>
+        <member name="T:UniversalSso.Client.Config">
+            <summary>
+            Settings for talking to the Universal SSO gateway (<c>ssod</c>), read from the environment.
+            </summary>
+            <param name="GatewayUrl">Base URL of ssod without a trailing slash; plain http only for loopback hosts.</param>
+            <param name="Provider">Provider id registered in the gateway (<c>azure</c> by default).</param>
+            <param name="ExpectedIdpHost">When set, the login redirect must go to this host or a subdomain.</param>
+            <param name="Timeout">Bound for every HTTP request.</param>
+        </member>
+        <member name="M:UniversalSso.Client.Config.#ctor(System.Uri,System.String,System.String,System.TimeSpan)">
+            <summary>
+            Settings for talking to the Universal SSO gateway (<c>ssod</c>), read from the environment.
+            </summary>
+            <param name="GatewayUrl">Base URL of ssod without a trailing slash; plain http only for loopback hosts.</param>
+            <param name="Provider">Provider id registered in the gateway (<c>azure</c> by default).</param>
+            <param name="ExpectedIdpHost">When set, the login redirect must go to this host or a subdomain.</param>
+            <param name="Timeout">Bound for every HTTP request.</param>
+        </member>
+        <member name="P:UniversalSso.Client.Config.GatewayUrl">
+            <summary>Base URL of ssod without a trailing slash; plain http only for loopback hosts.</summary>
+        </member>
+        <member name="P:UniversalSso.Client.Config.Provider">
+            <summary>Provider id registered in the gateway (<c>azure</c> by default).</summary>
+        </member>
+        <member name="P:UniversalSso.Client.Config.ExpectedIdpHost">
+            <summary>When set, the login redirect must go to this host or a subdomain.</summary>
+        </member>
+        <member name="P:UniversalSso.Client.Config.Timeout">
+            <summary>Bound for every HTTP request.</summary>
+        </member>
+        <member name="F:UniversalSso.Client.Config.DefaultGatewayUrl">
+            <summary>Gateway URL used when <c>SSO_GATEWAY_URL</c> is not set.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.Config.ProviderPattern">
+            <remarks>
+            Pattern:<br/>
+            <code>^[a-z0-9_-]{1,64}$</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ Match if at the beginning of the string.<br/>
+            ○ Match a character in the set [-0-9_a-z] atomically at least 1 and at most 64 times.<br/>
+            ○ Match if at the end of the string or if before an ending newline.<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="M:UniversalSso.Client.Config.FromLookup(System.Func{System.String,System.String},System.String)">
+            <summary>Builds a Config from <paramref name="getenv"/> (testable without the real environment).</summary>
+            <exception cref="T:UniversalSso.Client.ConfigException">A value is invalid.</exception>
+        </member>
+        <member name="M:UniversalSso.Client.Config.Endpoint(System.String)">
+            <summary>Absolute URL for a gateway path such as <c>/healthz</c>.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.User">
+            <summary>Normalized user profile returned by the gateway callback.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.User.#ctor(System.String,System.String,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>Normalized user profile returned by the gateway callback.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.Profile">
+            <summary>Body of a successful callback.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.Profile.#ctor(System.String,UniversalSso.Client.User)">
+            <summary>Body of a successful callback.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.Login">
+            <summary>A started sign-in: where the browser must go, and the state the gateway issued.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.Login.#ctor(System.Uri,System.String)">
+            <summary>A started sign-in: where the browser must go, and the state the gateway issued.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.GatewayClient">
+            <summary>
+            HTTP client for the Universal SSO gateway. Contract (see <c>cmd/ssod/handler.go</c>):
+            <c>GET /healthz</c> returns 200 <c>{"status":"ok"}</c>; <c>GET /providers</c> returns 200
+            <c>{"providers":[...]}</c>; <c>GET /auth/{provider}/login</c> returns 302 to the IdP;
+            <c>GET /auth/{provider}/callback</c> returns 200 <c>{"provider_id","user"}</c>; errors are
+            <c>{"code","message"}</c>. Redirects are never followed automatically so every hop can be checked.
+            Instances are thread-safe.
+            </summary>
+        </member>
+        <member name="M:UniversalSso.Client.GatewayClient.#ctor(UniversalSso.Client.Config)">
+            <summary>Creates a client for <paramref name="config"/>.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.GatewayClient.#ctor(UniversalSso.Client.Config,System.Net.Http.HttpMessageHandler)">
+            <summary>Creates a client with a custom handler (used by tests).</summary>
+        </member>
+        <member name="P:UniversalSso.Client.GatewayClient.Config">
+            <summary>The configuration in use.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.GatewayClient.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="M:UniversalSso.Client.GatewayClient.HealthAsync(System.Threading.CancellationToken)">
+            <summary>Completes normally when the gateway reports <c>{"status":"ok"}</c>.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.GatewayClient.ProvidersAsync(System.Threading.CancellationToken)">
+            <summary>Lists the provider ids registered in the gateway.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.GatewayClient.StartLoginAsync(System.Threading.CancellationToken)">
+            <summary>Asks the gateway to begin a sign-in and validates the redirect.</summary>
+            <exception cref="T:UniversalSso.Client.ApiException">The gateway refused (for example <c>PROVIDER_NOT_FOUND</c>).</exception>
+            <exception cref="T:UniversalSso.Client.PolicyException">The redirect failed the safety policy.</exception>
+        </member>
+        <member name="M:UniversalSso.Client.GatewayClient.FollowLocalAsync(UniversalSso.Client.Login,System.Threading.CancellationToken)">
+            <summary>
+            Completes a sign-in without a browser while every redirect stays on the gateway host. That holds
+            for the mock provider, which is why it is used for tests and demos. A real identity provider
+            needs a person at a browser.
+            </summary>
+            <exception cref="T:UniversalSso.Client.LeavesGatewayException">A redirect points at another host.</exception>
+        </member>
+        <member name="T:UniversalSso.Client.Policy">
+            <summary>
+            Client-side safety policy for the authorization redirect.
+            The gateway owns the signed state, the PKCE verifier and the client secret. This class only checks
+            that the redirect about to be handed to a browser is sane for an OAuth 2.0 / OIDC authorization-code
+            flow (Microsoft Entra ID uses one).
+            </summary>
+        </member>
+        <member name="M:UniversalSso.Client.Policy.CheckAuthorizeUrl(System.Uri,System.Uri,System.String)">
+            <summary>
+            Verifies <paramref name="redirect"/> and returns the <c>state</c> value it carries.
+            Rules: the scheme is http or https, and https is required unless the redirect stays on the
+            gateway's own host (the mock provider); when <paramref name="expectedHost"/> is set the host equals
+            it or is a subdomain; <c>state</c> is present; PKCE is used with <c>code_challenge_method=S256</c>.
+            </summary>
+            <exception cref="T:UniversalSso.Client.PolicyException">A rule is violated.</exception>
+        </member>
+        <member name="T:UniversalSso.Client.Program">
+            <summary>
+            Command line for the gateway client:
+            <c>check</c> (gateway reachable and provider registered), <c>login</c> (print the URL to open in a
+            browser) and <c>login --follow</c> (finish the sign-in without a browser; mock provider only).
+            </summary>
+        </member>
+        <member name="F:UniversalSso.Client.Program.DefaultProvider">
+            <summary>Gateway provider id used when <c>SSO_PROVIDER</c> is unset.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.Program.Main(System.String[])">
+            <summary>Process entry point.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.Program.RunAsync(System.String[],System.Func{System.String,System.String},System.IO.TextWriter,System.IO.TextWriter,System.Threading.CancellationToken)">
+            <summary>Runs one command and returns the process exit code.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.SsoException">
+            <summary>Base class for every error raised by this client.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.SsoException.#ctor(System.String)">
+            <summary>Creates an error with a message.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.SsoException.#ctor(System.String,System.Exception)">
+            <summary>Creates an error with a message and a cause.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.ConfigException">
+            <summary>A configuration value is missing or invalid.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.ConfigException.#ctor(System.String)">
+            <summary>A configuration value is missing or invalid.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.TransportException">
+            <summary>The gateway or network could not be reached, or the reply was unusable.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.TransportException.#ctor(System.String)">
+            <summary>Creates a transport error.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.TransportException.#ctor(System.String,System.Exception)">
+            <summary>Creates a transport error with a cause.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.PolicyException">
+            <summary>The login redirect failed the client-side safety policy.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.PolicyException.#ctor(System.String)">
+            <summary>The login redirect failed the client-side safety policy.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.LeavesGatewayException">
+            <summary>The flow needs a browser because a redirect leaves the gateway host.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.LeavesGatewayException.#ctor">
+            <summary>The flow needs a browser because a redirect leaves the gateway host.</summary>
+        </member>
+        <member name="T:UniversalSso.Client.ApiException">
+            <summary>The gateway answered with its structured error body <c>{"code","message"}</c>.</summary>
+        </member>
+        <member name="M:UniversalSso.Client.ApiException.#ctor(System.Int32,System.String,System.String)">
+            <summary>Creates an API error.</summary>
+        </member>
+        <member name="P:UniversalSso.Client.ApiException.Status">
+            <summary>HTTP status code.</summary>
+        </member>
+        <member name="P:UniversalSso.Client.ApiException.Code">
+            <summary>Machine-readable code such as <c>PROVIDER_NOT_FOUND</c>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.ProviderPattern_0">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the ProviderPattern method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.ProviderPattern_0.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.ProviderPattern_0.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.ProviderPattern_0.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.ProviderPattern_0.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.ProviderPattern_0.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.ProviderPattern_0.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.ProviderPattern_0.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.ProviderPattern_0.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.Utilities">
+            <summary>Helper methods used by generated <see cref="T:System.Text.RegularExpressions.Regex"/>-derived implementations.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout">
+            <summary>Default timeout value set in <see cref="T:System.AppContext"/>, or <see cref="F:System.Text.RegularExpressions.Regex.InfiniteMatchTimeout"/> if none was set.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_hasTimeout">
+            <summary>Whether <see cref="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout"/> is non-infinite.</summary>
+        </member>
+    </members>
+</doc>
